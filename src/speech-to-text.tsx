@@ -79,8 +79,7 @@ export default function Command() {
           {
             promptText: values.promptText,
             userTerms: values.userTerms,
-            useContext: values.useContext,
-            highlightedText: await getSelectedText()
+            highlightedText: values.useContext ? await getSelectedText():undefined
           }
         );
         setValue("transcription", result.text);

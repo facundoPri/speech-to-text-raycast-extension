@@ -23,6 +23,8 @@ export interface TranscriptionResult {
   text: string;
   timestamp: string;
   audioFile?: string;
+  language?: string;
+  prompt?: string;
 }
 
 

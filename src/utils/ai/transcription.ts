@@ -18,7 +18,6 @@ export async function transcribeAudio(
   promptOptions?: {
     promptText?: string;
     userTerms?: string;
-    useContext?: boolean;
     highlightedText?: string;
   }
 ): Promise<TranscriptionResult> {
@@ -62,7 +61,6 @@ export async function transcribeAudio(
     const prompt = buildCompletePrompt(
       promptOptions?.promptText ?? preferences.promptText,
       promptOptions?.userTerms ?? preferences.userTerms,
-      promptOptions?.useContext ?? preferences.enableContext,
       promptOptions?.highlightedText
     );
     
@@ -78,6 +76,9 @@ export async function transcribeAudio(
     const result: TranscriptionResult = {
       text: transcription.text.trim(),
       timestamp: new Date().toISOString(),
+      audioFile: filePath,
+      language: language,
+      prompt: prompt,
     };
 
     await saveTranscription(filePath, result);

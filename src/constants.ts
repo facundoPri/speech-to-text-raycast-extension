@@ -34,14 +34,12 @@ export const LANGUAGE_OPTIONS = [
  * Builds a complete prompt from the separate components
  * @param promptText Custom prompt instructions
  * @param userTerms Comma-separated list of specialized terms
- * @param useContext Whether to include highlighted text as context
  * @param highlightedText The text currently highlighted by the user (if any)
  * @returns Combined prompt string
  */
 export function buildCompletePrompt(
   promptText?: string, 
   userTerms?: string, 
-  useContext?: boolean,
   highlightedText?: string
 ): string {
   const parts: string[] = [];
@@ -60,7 +58,7 @@ export function buildCompletePrompt(
   }
   
   // Add highlighted text as context if requested and available
-  if (useContext && highlightedText && highlightedText.trim() !== "") {
+  if (highlightedText && highlightedText.trim() !== "") {
     parts.push(`Use the following text as context for the transcription:\n "${highlightedText.trim()}"`);
   }
   
