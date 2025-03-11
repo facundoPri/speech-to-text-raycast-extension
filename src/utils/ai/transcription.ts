@@ -8,6 +8,8 @@ import { buildCompletePrompt } from "../../constants";
  * Transcribes an audio file using Groq's API
  * @param filePath Path to the audio file
  * @param overrideLanguage Optional language to override the preference setting
+ * @param overridePrompt Optional prompt to override the preference setting
+ * @param overrideModel Optional model to override the preference setting
  * @param promptOptions Optional prompt components to override the preference settings
  * @returns Transcription result with text and metadata
  * @throws Error When transcription fails
@@ -17,6 +19,7 @@ export async function transcribeAudio(
   options?: {
     overrideLanguage?: string,
     overridePrompt?: string,
+    overrideModel?: string,
     promptOptions?: {
       promptText?: string;
       userTerms?: string;
@@ -39,6 +42,9 @@ export async function transcribeAudio(
     // Read the audio file
     const fileBuffer = fs.createReadStream(filePath);
 
+    // Use the override model if provided, otherwise use preferences
+    const model = options?.overrideModel ?? preferences.model;
+
     // Create a transcription request with optional language parameter
     const transcriptionOptions: {
       file: fs.ReadStream;
@@ -48,7 +54,7 @@ export async function transcribeAudio(
       prompt?: string;
     } = {
       file: fileBuffer,
-      model: preferences.model || "whisper-large-v3-turbo",
+      model: model,
       response_format: "verbose_json",
     };
 
@@ -82,6 +88,7 @@ export async function transcribeAudio(
       audioFile: filePath,
       language: language,
       prompt: prompt,
+      model: model,
     };
 
     await saveTranscription(filePath, result);

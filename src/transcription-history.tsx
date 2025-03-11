@@ -23,7 +23,7 @@ import { listAudioFiles, getAudioDuration } from "./utils/audio";
 import { saveTranscription, transcribeAudio, loadTranscription } from "./utils/ai/transcription";
 import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
 import { TranscriptionFile, TranscriptionResult, Preferences } from "./types";
-import { LANGUAGE_OPTIONS } from "./constants";
+import { LANGUAGE_OPTIONS, TRANSCRIPTION_MODELS, buildCompletePrompt } from "./constants";
 
 export default function TranscriptionHistory() {
   const { push } = useNavigation();
@@ -122,12 +122,14 @@ export default function TranscriptionHistory() {
       title: "Transcribing...",
       message: file.fileName,
     });
-    // Re-transcribe using the provided language and prompt
+    
+    // Re-transcribe using the provided language, prompt, and model
     const result = await transcribeAudio(
       file.filePath,
       {
         overrideLanguage: transcriptionData?.language,
-        overridePrompt: transcriptionData?.prompt
+        overridePrompt: transcriptionData?.prompt,
+        overrideModel: transcriptionData?.model,
       }
     );
     
@@ -399,9 +401,14 @@ function TranscriptionSettingsForm({
   const [promptText, setPromptText] = useState<string>(
     existingTranscription?.prompt ?? preferences.promptText ?? ""
   );
+  const [model, setModel] = useState<string>(
+    existingTranscription?.model ?? preferences.model
+  );
   
   // Handle form submission
   const handleSubmit = async () => {
+    // Build the complete prompt from components
+    const prompt = existingTranscription?.prompt ?? buildCompletePrompt(promptText, preferences.userTerms);
     
     // Create a modified transcription object with the new settings
     const modifiedTranscription: TranscriptionResult = {
@@ -409,7 +416,8 @@ function TranscriptionSettingsForm({
       text: existingTranscription?.text ?? "",
       timestamp: existingTranscription?.timestamp ?? new Date().toISOString(),
       language,
-      prompt: promptText,
+      prompt,
+      model,
     };
     
     // Go back to the previous screen
@@ -428,6 +436,22 @@ function TranscriptionSettingsForm({
         </ActionPanel>
       }
     >
+      <Form.Dropdown
+        id="model"
+        title="Model"
+        value={model}
+        onChange={setModel}
+        info="Select the AI model to use for transcription"
+      >
+        {TRANSCRIPTION_MODELS.map(model => (
+          <Form.Dropdown.Item 
+            key={model.id} 
+            value={model.id} 
+            title={model.name} 
+          />
+        ))}
+      </Form.Dropdown>
+      
       <Form.Dropdown
         id="language"
         title="Language"

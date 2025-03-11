@@ -14,11 +14,12 @@ import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
 import { Preferences } from "./types";
-import { LANGUAGE_OPTIONS } from "./constants";
+import { LANGUAGE_OPTIONS, TRANSCRIPTION_MODELS } from "./constants";
 
 interface TranscriptFormValues {
   transcription: string;
   language: string;
+  model: string;
   promptText: string;
   userTerms: string;
   useContext: boolean;
@@ -43,7 +44,8 @@ export default function Command() {
     },
     initialValues: {
       transcription: "",
-      language: preferences.language ?? "auto",
+      language: preferences.language ?? "",
+      model: preferences.model,
       promptText: preferences.promptText ?? "",
       userTerms: preferences.userTerms ?? "",
       useContext: preferences.enableContext ?? true,
@@ -84,6 +86,7 @@ export default function Command() {
           recordingFilePath, 
           {
             overrideLanguage: values.language,
+            overrideModel: values.model,
             promptOptions: {
               promptText: values.promptText,
               userTerms: values.userTerms,
@@ -200,8 +203,19 @@ export default function Command() {
         </ActionPanel>
       }
     >
+
+      <Form.TextArea
+        {...itemProps.transcription}
+        title={getTitle()}
+        placeholder={getPlaceholder()}
+        enableMarkdown={false}
+        autoFocus
+      />
+
+      <Form.Separator />
+
       {/* Prompt field for custom instructions */}
-      <Form.TextField
+      <Form.TextArea
         {...itemProps.promptText}
         title="Prompt"
         placeholder="Custom instructions to guide the AI transcription"
@@ -239,13 +253,21 @@ export default function Command() {
         ))}
       </Form.Dropdown>
       
-      <Form.TextArea
-        {...itemProps.transcription}
-        title={getTitle()}
-        placeholder={getPlaceholder()}
-        enableMarkdown={false}
-        autoFocus
-      />
+      {/* Model dropdown for quick selection */}
+      <Form.Dropdown
+        {...itemProps.model}
+        title="Model"
+        info="Select a model for better transcription accuracy"
+      >
+        {TRANSCRIPTION_MODELS.map(model => (
+          <Form.Dropdown.Item 
+            key={model.id} 
+            value={model.id} 
+            title={model.name} 
+          />
+        ))}
+      </Form.Dropdown>
+      
     </Form>
   );
 }

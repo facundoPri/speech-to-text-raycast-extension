@@ -25,6 +25,7 @@ export interface TranscriptionResult {
   audioFile?: string;
   language?: string;
   prompt?: string;
+  model?: string;
 }
 
 
