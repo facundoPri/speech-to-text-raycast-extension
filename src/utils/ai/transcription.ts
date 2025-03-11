@@ -2,15 +2,26 @@ import Groq from "groq-sdk";
 import fs from "fs-extra";
 import { getPreferenceValues } from "@raycast/api";
 import { Preferences, TranscriptionResult } from "../../types";
+import { buildCompletePrompt } from "../../constants";
 
 /**
  * Transcribes an audio file using Groq's API
  * @param filePath Path to the audio file
  * @param overrideLanguage Optional language to override the preference setting
+ * @param promptOptions Optional prompt components to override the preference settings
  * @returns Transcription result with text and metadata
  * @throws Error When transcription fails
  */
-export async function transcribeAudio(filePath: string, overrideLanguage?: string): Promise<TranscriptionResult> {
+export async function transcribeAudio(
+  filePath: string, 
+  overrideLanguage?: string,
+  promptOptions?: {
+    promptText?: string;
+    userTerms?: string;
+    useContext?: boolean;
+    highlightedText?: string;
+  }
+): Promise<TranscriptionResult> {
   const preferences = getPreferenceValues<Preferences>();
 
   if (!preferences.apiKey) {
@@ -32,6 +43,7 @@ export async function transcribeAudio(filePath: string, overrideLanguage?: strin
       model: string;
       response_format: "verbose_json" | "json" | "text";
       language?: string;
+      prompt?: string;
     } = {
       file: fileBuffer,
       model: preferences.model || "whisper-large-v3-turbo",
@@ -44,6 +56,19 @@ export async function transcribeAudio(filePath: string, overrideLanguage?: strin
     // Add language parameter if it's not set to auto
     if (language && language !== "auto") {
       transcriptionOptions.language = language;
+    }
+    
+    // Build the complete prompt from components
+    const prompt = buildCompletePrompt(
+      promptOptions?.promptText ?? preferences.promptText,
+      promptOptions?.userTerms ?? preferences.userTerms,
+      promptOptions?.useContext ?? preferences.enableContext,
+      promptOptions?.highlightedText
+    );
+    
+    // Add prompt parameter if it's not empty
+    if (prompt && prompt.trim() !== "") {
+      transcriptionOptions.prompt = prompt;
     }
 
     // Create a transcription of the audio file

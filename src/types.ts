@@ -2,6 +2,9 @@ export interface Preferences {
   apiKey: string;
   model: string;
   language: string;
+  promptText?: string;
+  userTerms?: string;
+  enableContext?: boolean;
   tempDirectory?: string;
 }
 

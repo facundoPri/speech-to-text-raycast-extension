@@ -30,6 +30,43 @@ export const LANGUAGE_OPTIONS = [
   { value: "ru", title: "Russian" },
 ] as const;
 
+/**
+ * Builds a complete prompt from the separate components
+ * @param promptText Custom prompt instructions
+ * @param userTerms Comma-separated list of specialized terms
+ * @param useContext Whether to include highlighted text as context
+ * @param highlightedText The text currently highlighted by the user (if any)
+ * @returns Combined prompt string
+ */
+export function buildCompletePrompt(
+  promptText?: string, 
+  userTerms?: string, 
+  useContext?: boolean,
+  highlightedText?: string
+): string {
+  const parts: string[] = [];
+  
+  // Add custom prompt if provided
+  if (promptText && promptText.trim() !== "") {
+    parts.push(promptText.trim());
+  }
+  
+  // Add terms dictionary if provided
+  if (userTerms && userTerms.trim() !== "") {
+    const termsArray = userTerms.split(",").map(term => term.trim()).filter(term => term !== "");
+    if (termsArray.length > 0) {
+      parts.push(`The following are specialized terms or names that should be recognized correctly: ${termsArray.join(", ")}.`);
+    }
+  }
+  
+  // Add highlighted text as context if requested and available
+  if (useContext && highlightedText && highlightedText.trim() !== "") {
+    parts.push(`Use the following text as context for the transcription:\n "${highlightedText.trim()}"`);
+  }
+  
+  return parts.join(" ");
+}
+
 // Sox Configuration
 export const SOX_CONFIG = {
   CHANNELS: 1,           // Mono channel

@@ -105,6 +105,31 @@
       ]
     },
     {
+      "name": "promptText",
+      "title": "Default Prompt",
+      "description": "Default prompt text to guide the AI transcription",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "Enter instructions for the AI transcription",
+      "default": "Maintain proper sentence structure, punctuation, and paragraphs. Format numbers, currency, and units appropriately. Preserve speaker transitions if multiple speakers are detected."
+    },
+    {
+      "name": "userTerms",
+      "title": "Custom Terms",
+      "description": "Comma-separated list of specialized terms, names, or jargon to help with transcription accuracy",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "e.g., React.js, TypeScript, GraphQL, <names>, etc."
+    },
+    {
+      "name": "enableContext",
+      "title": "Use Highlighted Text",
+      "description": "Automatically use any text you have highlighted in other apps as context for transcription",
+      "type": "checkbox",
+      "default": true,
+      "required": false
+    },
+    {
       "name": "tempDirectory",
       "title": "Temporary Directory",
       "description": "Directory to store temporary audio recordings",
