@@ -46,19 +46,21 @@ export default function Command() {
   });
 
   // Use our audio recorder hook
-  const { isRecording, recordingDuration, recordingPath, soxInstalled, error, startRecording, stopRecording } =
+  const { isRecording, recordingDuration, recordingPath, error, startRecording, stopRecording } =
     useAudioRecorder();
 
   // Update view mode based on state
   useEffect(() => {
-    if (isRecording || recordingPath) {
+    if (error) {
+      setViewMode("welcome");
+    } else if (isRecording || recordingPath) {
       setViewMode("recording");
     } else if (transcriptionText) {
       setViewMode("transcript");
     } else {
       setViewMode("welcome");
     }
-  }, [isRecording, recordingPath, transcriptionText]);
+  }, [isRecording, recordingPath, transcriptionText, error]);
 
   // Update form values when transcription changes
   useEffect(() => {
@@ -160,10 +162,6 @@ export default function Command() {
       return `# ❌ Error\n\n${error}`;
     }
 
-    if (!soxInstalled) {
-      return `# 🔍 Sox Not Installed\n\nSox is required for audio recording. Please install it using:\n\n\`\`\`\nbrew install sox\n\`\`\`\n\nThen restart Raycast.`;
-    }
-
     if (isEditing) {
       return "";
     }
@@ -243,7 +241,7 @@ export default function Command() {
       }
       actions={
         <ActionPanel>
-          {!isRecording && !recordingPath && soxInstalled && (
+          {!isRecording && !recordingPath && (
             <Action
               title="Start Recording"
               icon={Icon.Microphone}
