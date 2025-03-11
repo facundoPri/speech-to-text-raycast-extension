@@ -14,11 +14,14 @@ import { buildCompletePrompt } from "../../constants";
  */
 export async function transcribeAudio(
   filePath: string, 
-  overrideLanguage?: string,
-  promptOptions?: {
-    promptText?: string;
-    userTerms?: string;
-    highlightedText?: string;
+  options?: {
+    overrideLanguage?: string,
+    overridePrompt?: string,
+    promptOptions?: {
+      promptText?: string;
+      userTerms?: string;
+      highlightedText?: string;
+    }
   }
 ): Promise<TranscriptionResult> {
   const preferences = getPreferenceValues<Preferences>();
@@ -50,7 +53,7 @@ export async function transcribeAudio(
     };
 
     // Use the override language if provided, otherwise use preferences
-    const language = overrideLanguage ?? preferences.language;
+    const language = options?.overrideLanguage ?? preferences.language;
     
     // Add language parameter if it's not set to auto
     if (language && language !== "auto") {
@@ -58,10 +61,10 @@ export async function transcribeAudio(
     }
     
     // Build the complete prompt from components
-    const prompt = buildCompletePrompt(
-      promptOptions?.promptText ?? preferences.promptText,
-      promptOptions?.userTerms ?? preferences.userTerms,
-      promptOptions?.highlightedText
+    const prompt = options?.overridePrompt ?? buildCompletePrompt(
+      options?.promptOptions?.promptText ?? preferences.promptText,
+      options?.promptOptions?.userTerms ?? preferences.userTerms,
+      options?.promptOptions?.highlightedText
     );
     
     // Add prompt parameter if it's not empty

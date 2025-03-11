@@ -82,11 +82,13 @@ export default function Command() {
         // Pass the selected language and prompt options to the transcription function
         const result = await transcribeAudio(
           recordingFilePath, 
-          values.language, 
           {
-            promptText: values.promptText,
-            userTerms: values.userTerms,
-            highlightedText: values.useContext ? selection : undefined
+            overrideLanguage: values.language,
+            promptOptions: {
+              promptText: values.promptText,
+              userTerms: values.userTerms,
+              highlightedText: values.useContext ? selection : undefined
+            }
           }
         );
         setValue("transcription", result.text);
@@ -210,7 +212,7 @@ export default function Command() {
       <Form.TextField
         {...itemProps.userTerms}
         title="Custom Terms"
-        placeholder="React.js, TypeScript, GraphQL, Facundo Prieto"
+        placeholder="React.js, TypeScript, GraphQL, John Doe"
         info="Comma-separated list of specialized terms, names, or jargon"
       />
       

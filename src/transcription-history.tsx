@@ -17,7 +17,7 @@ import fs from "fs-extra";
 import path from "path";
 import { exec } from "child_process";
 import { listAudioFiles, getAudioDuration } from "./utils/audio";
-import { saveTranscription, transcribeAudio } from "./utils/ai/transcription";
+import { saveTranscription, transcribeAudio, loadTranscription } from "./utils/ai/transcription";
 import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
 import { TranscriptionFile } from "./types";
 
@@ -112,13 +112,24 @@ export default function TranscriptionHistory() {
 
   const handleTranscribe = async (file: TranscriptionFile) => {
     try {
+      // Load existing transcription data to get language and prompt
+      const existingTranscription = await loadTranscription(file.filePath);
+      
       await showToast({
         style: Toast.Style.Animated,
         title: "Transcribing...",
         message: file.fileName,
       });
-
-      const result = await transcribeAudio(file.filePath);
+      
+      // Re-transcribe using the original language and prompt if available
+      const result = await transcribeAudio(
+        file.filePath,
+        {
+          overrideLanguage: existingTranscription?.language,
+          overridePrompt: existingTranscription?.prompt
+        }
+      );
+      
       await saveTranscription(file.filePath, result);
 
       // Update file list
