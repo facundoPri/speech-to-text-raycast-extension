@@ -16,13 +16,14 @@ import {
   Form,
   getPreferenceValues,
 } from "@raycast/api";
+import { showFailureToast } from "@raycast/utils";
 import fs from "fs-extra";
 import path from "path";
 import { exec } from "child_process";
 import { listAudioFiles, getAudioDuration } from "./utils/audio";
 import { saveTranscription, transcribeAudio, loadTranscription } from "./utils/ai/transcription";
 import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
-import { TranscriptionFile, TranscriptionResult, Preferences } from "./types";
+import { TranscriptionFile, TranscriptionResult, Preferences, TranscriptionModelId } from "./types";
 import { LANGUAGE_OPTIONS, TRANSCRIPTION_MODELS, buildCompletePrompt } from "./constants";
 
 export default function TranscriptionHistory() {
@@ -107,10 +108,8 @@ export default function TranscriptionHistory() {
       setFiles(transcriptionFiles);
     } catch (error) {
       console.error("Error loading audio files:", error);
-      await showToast({
-        style: Toast.Style.Failure,
+      await showFailureToast(error, {
         title: "Failed to Load Files",
-        message: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsLoading(false);
@@ -188,10 +187,8 @@ export default function TranscriptionHistory() {
     } catch (error) {
       console.error("Transcription error:", error);
 
-      await showToast({
-        style: Toast.Style.Failure,
+      await showFailureToast(error, {
         title: "Transcription Failed",
-        message: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -226,10 +223,8 @@ export default function TranscriptionHistory() {
     } catch (error) {
       console.error("Error deleting file:", error);
 
-      await showToast({
-        style: Toast.Style.Failure,
+      await showFailureToast(error, {
         title: "Delete Failed",
-        message: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -394,7 +389,7 @@ function TranscriptionSettingsForm({
 
   const [language, setLanguage] = useState<string>(existingTranscription?.language ?? preferences.language ?? "auto");
   const [promptText, setPromptText] = useState<string>(existingTranscription?.prompt ?? preferences.promptText ?? "");
-  const [model, setModel] = useState<string>(existingTranscription?.model ?? preferences.model);
+  const [model, setModel] = useState<TranscriptionModelId>(existingTranscription?.model ?? preferences.model);
 
   const handleSubmit = async () => {
     const prompt = existingTranscription?.prompt ?? buildCompletePrompt(promptText, preferences.userTerms);
@@ -426,7 +421,7 @@ function TranscriptionSettingsForm({
         id="model"
         title="Model"
         value={model}
-        onChange={setModel}
+        onChange={(newValue) => setModel(newValue as TranscriptionModelId)}
         info="Select the AI model to use for transcription"
       >
         {TRANSCRIPTION_MODELS.map((model) => (

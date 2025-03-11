@@ -10,7 +10,7 @@ import {
   getPreferenceValues,
   getSelectedText,
 } from "@raycast/api";
-import { useForm } from "@raycast/utils";
+import { useForm, showFailureToast } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
 import { Preferences, TranscriptionModelId } from "./types";
@@ -94,10 +94,8 @@ export default function Command() {
         });
       } catch (error) {
         console.error("Transcription error:", error);
-        await showToast({
-          style: Toast.Style.Failure,
+        await showFailureToast(error, {
           title: "Transcription failed",
-          message: error instanceof Error ? error.message : "Unknown error",
         });
       } finally {
         setIsTranscribing(false);
@@ -112,8 +110,7 @@ export default function Command() {
 
   useEffect(() => {
     if (error) {
-      showToast({
-        style: Toast.Style.Failure,
+      void showFailureToast({
         title: "Error",
         message: error,
       });

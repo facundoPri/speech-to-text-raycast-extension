@@ -8,6 +8,7 @@ import {
   validateAudioFile,
 } from "../utils/audio";
 import { showToast, Toast } from "@raycast/api";
+import { showFailureToast } from "@raycast/utils";
 import { ErrorTypes } from "../types";
 
 interface AudioRecorderHook {
@@ -43,19 +44,14 @@ export function useAudioRecorder(): AudioRecorderHook {
     };
   }, []);
 
-  const showErrorToast = async (title: string, message: string): Promise<void> => {
-    await showToast({
-      style: Toast.Style.Failure,
-      title,
-      message,
-    });
-  };
-
   const startRecording = async (): Promise<string | null> => {
     setError(null);
 
     if (isRecording) {
-      await showErrorToast("Already Recording", "A recording is already in progress");
+      await showFailureToast({
+        title: "Already Recording",
+        message: "A recording is already in progress",
+      });
       return null;
     }
 
@@ -126,6 +122,10 @@ export function useAudioRecorder(): AudioRecorderHook {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error starting recording:", error);
 
+      await showFailureToast(error, {
+        title: "Failed to start recording",
+      });
+
       setError(`${ErrorTypes.RECORDING_START_ERROR}: ${errorMessage}`);
       return null;
     }
@@ -156,6 +156,10 @@ export function useAudioRecorder(): AudioRecorderHook {
         const validationResult = await validateAudioFile(currentRecordingPath);
 
         if (!validationResult.isValid) {
+          await showFailureToast({
+            title: "Invalid Recording",
+            message: validationResult.error ?? ErrorTypes.INVALID_RECORDING,
+          });
           setError(validationResult.error ?? ErrorTypes.INVALID_RECORDING);
           return null;
         }
@@ -169,12 +173,21 @@ export function useAudioRecorder(): AudioRecorderHook {
         console.log("Returning recording path:", currentRecordingPath);
         return currentRecordingPath;
       } else {
+        await showFailureToast({
+          title: "Recording Failed",
+          message: ErrorTypes.NO_RECORDING_FILE,
+        });
         setError(ErrorTypes.NO_RECORDING_FILE);
         return null;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error stopping recording:", error);
+
+      await showFailureToast({
+        title: "Failed to stop recording",
+        message: errorMessage,
+      });
 
       setError(`${ErrorTypes.RECORDING_STOP_ERROR}: ${errorMessage}`);
       setIsRecording(false);
