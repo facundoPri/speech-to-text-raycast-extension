@@ -32,6 +32,59 @@ export default function TranscriptionHistory() {
   const [searchText, setSearchText] = useState("");
   const [isShowingDetails, setIsShowingDetails] = useState(true);
 
+  const parseRecordingDate = (fileName: string): Date => {
+    const regex = /recording-(.+)\.wav$/;
+    const dateMatch = regex.exec(fileName);
+    const dateStr = dateMatch ? dateMatch[1].replace(/-/g, (match, offset) => {
+      if (offset === 10) return "T"; // After date
+      if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
+      return "-"; // Date separators
+    }) : "";
+    
+    return dateStr ? new Date(dateStr) : new Date();
+  };
+
+  const loadTranscriptionFromFile = async (filePath: string): Promise<string | null> => {
+    const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
+    
+    if (await fs.pathExists(transcriptionFilePath)) {
+      try {
+        const transcriptionData = await fs.readJSON(transcriptionFilePath);
+        return transcriptionData.text || null;
+      } catch (error) {
+        console.error(`Error reading transcription file ${transcriptionFilePath}:`, error);
+      }
+    }
+    
+    return null;
+  };
+
+  const processAudioFile = async (filePath: string): Promise<TranscriptionFile | null> => {
+    try {
+      const stats = await fs.stat(filePath);
+      const fileName = path.basename(filePath);
+
+      const recordedAt = parseRecordingDate(fileName);
+
+      const duration = await getAudioDuration(filePath);
+
+      const transcription = await loadTranscriptionFromFile(filePath);
+
+      return {
+        id: fileName,
+        filePath,
+        fileName,
+        recordedAt,
+        duration,
+        sizeInBytes: stats.size,
+        transcription,
+        wordCount: transcription ? transcription.split(/\s+/).filter(Boolean).length : 0,
+      };
+    } catch (error) {
+      console.error(`Error processing file ${filePath}:`, error);
+      return null;
+    }
+  };
 
   const loadFiles = async () => {
     setIsLoading(true);
@@ -41,47 +94,9 @@ export default function TranscriptionHistory() {
       const transcriptionFiles: TranscriptionFile[] = [];
 
       for (const filePath of audioFiles) {
-        try {
-          const stats = await fs.stat(filePath);
-          const fileName = path.basename(filePath);
-
-          // Extract timestamp from filename (format: recording-YYYY-MM-DDThh-mm-ss-xxxZ.wav)
-          const regex = /recording-(.+)\.wav$/;
-          const dateMatch = regex.exec(fileName);
-          const dateStr = dateMatch ? dateMatch[1].replace(/-/g, (match, offset) => {
-            if (offset === 10) return "T"; // After date
-            if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
-            return "-"; // Date separators
-          }) : "";
-
-          const recordedAt = dateStr ? new Date(dateStr) : new Date(stats.mtime);
-
-          const duration = await getAudioDuration(filePath);
-
-          const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
-          let transcription = null;
-
-          if (await fs.pathExists(transcriptionFilePath)) {
-            try {
-              const transcriptionData = await fs.readJSON(transcriptionFilePath);
-              transcription = transcriptionData.text || null;
-            } catch (error) {
-              console.error(`Error reading transcription file ${transcriptionFilePath}:`, error);
-            }
-          }
-
-          transcriptionFiles.push({
-            id: fileName,
-            filePath,
-            fileName,
-            recordedAt,
-            duration,
-            sizeInBytes: stats.size,
-            transcription,
-            wordCount: transcription ? transcription.split(/\s+/).filter(Boolean).length : 0,
-          });
-        } catch (error) {
-          console.error(`Error processing file ${filePath}:`, error);
+        const file = await processAudioFile(filePath);
+        if (file) {
+          transcriptionFiles.push(file);
         }
       }
 
