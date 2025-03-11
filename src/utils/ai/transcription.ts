@@ -76,7 +76,7 @@ export async function transcribeAudio(
 
     // Save the transcription to a JSON file
     const result: TranscriptionResult = {
-      text: transcription.text,
+      text: transcription.text.trim(),
       timestamp: new Date().toISOString(),
     };
 
