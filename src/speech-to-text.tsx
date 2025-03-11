@@ -2,308 +2,171 @@ import { useState, useEffect } from "react";
 import {
   Action, 
   ActionPanel,
-  Detail,
-  Icon,
+  Form,
   Clipboard,
   showToast,
   Toast,
-  Color,
-  Alert,
-  confirmAlert,
-  Form,
   open
 } from "@raycast/api";
 import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
-import { formatDuration } from "./utils/formatting";
 
 interface TranscriptFormValues {
   transcription: string;
 }
 
 export default function Command() {
-  const [isEditing, setIsEditing] = useState(false);
-  const [transcriptionText, setTranscriptionText] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [viewMode, setViewMode] = useState<"recording" | "transcript" | "welcome">("welcome");
 
-  // Form for editing transcription
-  const { handleSubmit, itemProps, setValue, reset } = useForm<TranscriptFormValues>({
+  // Use our audio recorder hook
+  const { isRecording, recordingDuration, error, startRecording, stopRecording } =
+    useAudioRecorder();
+
+  // Form for transcription
+  const { handleSubmit, itemProps, setValue } = useForm<TranscriptFormValues>({
     onSubmit: (values) => {
-      setTranscriptionText(values.transcription);
-      setIsEditing(false);
+      Clipboard.copy(values.transcription);
+      showToast({
+        style: Toast.Style.Success,
+        title: "Copied to clipboard",
+      });
     },
     initialValues: {
       transcription: "",
     },
-    validation: {
-      transcription: (value) => {
-        if (!value) return "Transcription cannot be empty";
-        return undefined;
-      },
-    },
   });
 
-  // Use our audio recorder hook
-  const { isRecording, recordingDuration, recordingPath, error, startRecording, stopRecording } =
-    useAudioRecorder();
+  const handleStopRecording = async () => {
+    const recordingFilePath = await stopRecording();
+    
+    if (recordingFilePath) {
+      try {
+        setIsTranscribing(true);
+        
+        // Show a subtle toast
+        await showToast({
+          style: Toast.Style.Animated,
+          title: "Transcribing...",
+        });
+        
+        const result = await transcribeAudio(recordingFilePath);
+        setValue("transcription", result.text);
+        
+        // Copy to clipboard automatically
+        await Clipboard.copy(result.text);
+        
+        await showToast({
+          style: Toast.Style.Success,
+          title: "Transcription complete",
+          message: "Text copied to clipboard",
+        });
+      } catch (error) {
+        console.error("Transcription error:", error);
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Transcription failed",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } finally {
+        setIsTranscribing(false);
+      }
+    }
+  };
 
-  // Update view mode based on state
+  const handleNewRecording = () => {
+    setValue("transcription", "");
+    startRecording();
+  };
+  
+  // Handle errors
   useEffect(() => {
     if (error) {
-      setViewMode("welcome");
-    } else if (isRecording || recordingPath) {
-      setViewMode("recording");
-    } else if (transcriptionText) {
-      setViewMode("transcript");
-    } else {
-      setViewMode("welcome");
-    }
-  }, [isRecording, recordingPath, transcriptionText, error]);
-
-  // Update form values when transcription changes
-  useEffect(() => {
-    if (transcriptionText) {
-      setValue("transcription", transcriptionText);
-    }
-  }, [transcriptionText, setValue]);
-
-  const transcribeRecording = async () => {
-    if (!recordingPath) return;
-
-    try {
-      setIsTranscribing(true);
-
-      await showToast({
-        style: Toast.Style.Animated,
-        title: "Transcribing...",
-        message: "Processing your audio with Groq",
-      });
-
-      const result = await transcribeAudio(recordingPath);
-      setTranscriptionText(result.text);
-      setValue("transcription", result.text);
-
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Transcription Complete",
-        message: "Text copied to clipboard",
-      });
-
-      // Copy to clipboard
-      await Clipboard.copy(result.text);
-    } catch (error) {
-      console.error("Transcription error:", error);
-
-      await showToast({
+      showToast({
         style: Toast.Style.Failure,
-        title: "Transcription Failed",
-        message: error instanceof Error ? error.message : String(error),
+        title: "Error",
+        message: error,
       });
-    } finally {
-      setIsTranscribing(false);
     }
+  }, [error]);
+
+  // Format recording duration nicely
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleNewRecording = async () => {
-    if (transcriptionText) {
-      const shouldContinue = await confirmAlert({
-        title: "Start New Recording?",
-        message: "This will discard your current transcription. Are you sure you want to continue?",
-        primaryAction: {
-          title: "Continue",
-          style: Alert.ActionStyle.Destructive,
-        },
-      });
-
-      if (!shouldContinue) return;
-    }
-
-    setTranscriptionText(null);
-    reset({
-      transcription: "",
-    });
-  };
-
-  const editTranscript = () => {
-    setIsEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setValue("transcription", transcriptionText || "");
-    setIsEditing(false);
-  };
-
-  const renderEditForm = () => {
-    return (
-      <Form
-        isLoading={isTranscribing}
-        actions={
-          <ActionPanel>
-            <Action.SubmitForm title="Save Changes" icon={Icon.Check} onSubmit={handleSubmit} />
-            <Action title="Cancel" icon={Icon.XMarkCircle} onAction={cancelEditing} />
-          </ActionPanel>
-        }
-      >
-        <Form.TextArea
-          {...itemProps.transcription}
-          title="Transcription"
-          placeholder="Your transcription will appear here"
-          enableMarkdown
-          autoFocus
-        />
-      </Form>
-    );
-  };
-
-  const getMarkdown = () => {
-    if (error) {
-      return `# ❌ Error\n\n${error}`;
-    }
-
-    if (isEditing) {
-      return "";
-    }
-
-    if (viewMode === "transcript" && transcriptionText) {
-      return `# 📝 Transcription Result\n\n${transcriptionText}\n\n---\n\n*Recording duration: ${formatDuration(recordingDuration)}*`;
-    }
-
+  // Get appropriate placeholder text
+  const getPlaceholder = () => {
     if (isRecording) {
-      return `# 🎙️ Recording in Progress\n\n${getRecordingIndicator()} **Recording... ${formatDuration(recordingDuration)}**\n\nPress **Stop Recording** when you're done.`;
+      return `Recording in progress... (${formatDuration(recordingDuration)})`;
     }
-
-    if (viewMode === "recording" && recordingPath && !transcriptionText) {
-      return `# ✅ Recording Complete\n\n**Recording saved to:** \`${recordingPath}\`\n\n**Duration:** ${formatDuration(recordingDuration)}\n\nPress **Transcribe** to convert your audio to text.`;
+    if (isTranscribing) {
+      return "Transcribing your audio...";
     }
-
-    return `# 🎤 Speech to Text\n\nWelcome to Speech to Text! This extension allows you to record audio and transcribe it to text using Groq's API.\n\n## Getting Started\n\n1. Press **Start Recording** to begin capturing audio\n2. Speak clearly into your microphone\n3. Press **Stop Recording** when you're done\n4. Press **Transcribe** to convert your audio to text\n\n*Keyboard Shortcuts*\n- Start Recording: ⌘ + R\n- Stop Recording: ⌘ + S\n- Transcribe: ⌘ + T\n- Copy Text: ⌘ + C`;
+    return "Start recording with ⌘+R";
   };
 
-  const getRecordingIndicator = () => {
-    const pulseCount = Math.floor(recordingDuration % 4);
-    const pulses = ["⬤", "⬤⬤", "⬤⬤⬤", "⬤⬤⬤⬤"];
-    return `🔴 ${pulses[pulseCount]}`;
+  // Get form title with status indicator
+  const getTitle = () => {
+    if (isRecording) {
+      return "Recording";
+    }
+    if (isTranscribing) {
+      return "Transcribing";
+    }
+    return "Speech to Text";
   };
-
-  if (isEditing) {
-    return renderEditForm();
-  }
 
   return (
-    <Detail
-      markdown={getMarkdown()}
-      metadata={
-        transcriptionText ? (
-          <Detail.Metadata>
-            <Detail.Metadata.Label
-              title="Duration"
-              text={formatDuration(recordingDuration)}
-              icon={{ source: Icon.Clock, tintColor: Color.PrimaryText }}
-            />
-            <Detail.Metadata.Separator />
-            <Detail.Metadata.TagList title="Status">
-              <Detail.Metadata.TagList.Item text="Transcribed" color={Color.Green} />
-            </Detail.Metadata.TagList>
-            <Detail.Metadata.Separator />
-            <Detail.Metadata.Label
-              title="Word Count"
-              text={transcriptionText.split(/\s+/).filter(Boolean).length.toString()}
-              icon={{ source: Icon.TextDocument, tintColor: Color.PrimaryText }}
-            />
-          </Detail.Metadata>
-        ) : isRecording ? (
-          <Detail.Metadata>
-            <Detail.Metadata.Label
-              title="Duration"
-              text={formatDuration(recordingDuration)}
-              icon={{ source: Icon.Clock, tintColor: Color.Red }}
-            />
-            <Detail.Metadata.Separator />
-            <Detail.Metadata.TagList title="Status">
-              <Detail.Metadata.TagList.Item text="Recording" color={Color.Red} />
-            </Detail.Metadata.TagList>
-          </Detail.Metadata>
-        ) : recordingPath ? (
-          <Detail.Metadata>
-            <Detail.Metadata.Label
-              title="Duration"
-              text={formatDuration(recordingDuration)}
-              icon={{ source: Icon.Clock, tintColor: Color.PrimaryText }}
-            />
-            <Detail.Metadata.Separator />
-            <Detail.Metadata.TagList title="Status">
-              <Detail.Metadata.TagList.Item text="Ready to Transcribe" color={Color.Yellow} />
-            </Detail.Metadata.TagList>
-          </Detail.Metadata>
-        ) : null
-      }
+    <Form
+      isLoading={isTranscribing}
       actions={
         <ActionPanel>
-          {!isRecording && !recordingPath && (
+          {!isRecording && (
             <Action
               title="Start Recording"
-              icon={Icon.Microphone}
-              onAction={startRecording}
+              onAction={handleNewRecording}
               shortcut={{ modifiers: ["cmd"], key: "r" }}
             />
           )}
-
+          
           {isRecording && (
             <Action
               title="Stop Recording"
-              icon={Icon.Stop}
-              onAction={stopRecording}
+              onAction={handleStopRecording}
               shortcut={{ modifiers: ["cmd"], key: "s" }}
             />
           )}
-
-          {recordingPath && !isRecording && !transcriptionText && (
-            <Action
-              title={isTranscribing ? "Transcribing…" : "Transcribe"}
-              icon={Icon.Text}
-              onAction={transcribeRecording}
-              shortcut={{ modifiers: ["cmd"], key: "t" }}
-            />
-          )}
-
-          {transcriptionText && (
-            <ActionPanel.Section title="Transcript Actions">
-              <Action
-                title="Copy to Clipboard"
-                icon={Icon.Clipboard}
-                onAction={() => Clipboard.copy(transcriptionText)}
-                shortcut={{ modifiers: ["cmd"], key: "c" }}
-              />
-              <Action
-                title="Edit Transcription"
-                icon={Icon.Pencil}
-                onAction={editTranscript}
-                shortcut={{ modifiers: ["cmd"], key: "e" }}
-              />
-            </ActionPanel.Section>
-          )}
-
-          {(recordingPath || transcriptionText) && (
-            <ActionPanel.Section title="Recording">
-              <Action
-                title="New Recording"
-                icon={Icon.Plus}
-                onAction={handleNewRecording}
-                shortcut={{ modifiers: ["cmd"], key: "n" }}
-              />
-              <Action
-                title="View History"
-                icon={Icon.List}
-                onAction={() => open("raycast://extensions/facundo_prieto/speech-to-text/transcription-history")}
-                shortcut={{ modifiers: ["cmd", "shift"], key: "h" }}
-              />
-            </ActionPanel.Section>
-          )}
+          
+          <Action.SubmitForm 
+            title="Copy to Clipboard" 
+            onSubmit={handleSubmit} 
+            shortcut={{ modifiers: ["cmd"], key: "c" }}
+          />
+          
+          <Action
+            title="New Recording"
+            onAction={handleNewRecording}
+            shortcut={{ modifiers: ["cmd"], key: "n" }}
+          />
+          
+          <Action
+            title="View History"
+            onAction={() => open("raycast://extensions/facundo_prieto/speech-to-text/transcription-history")}
+            shortcut={{ modifiers: ["cmd", "shift"], key: "h" }}
+          />
         </ActionPanel>
       }
-      isLoading={isTranscribing}
-    />
+    >
+      <Form.TextArea
+        {...itemProps.transcription}
+        title={getTitle()}
+        placeholder={getPlaceholder()}
+        enableMarkdown={false}
+        autoFocus
+      />
+    </Form>
   );
 }
