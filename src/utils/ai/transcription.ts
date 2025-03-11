@@ -1,7 +1,7 @@
 import Groq from "groq-sdk";
 import fs from "fs-extra";
 import { getPreferenceValues } from "@raycast/api";
-import { Preferences, TranscriptionResult } from "../../types";
+import { Preferences, TranscriptionModelId, TranscriptionResult } from "../../types";
 import { buildCompletePrompt } from "../../constants";
 
 export async function transcribeAudio(
@@ -9,7 +9,7 @@ export async function transcribeAudio(
   options?: {
     overrideLanguage?: string;
     overridePrompt?: string;
-    overrideModel?: string;
+    overrideModel?: TranscriptionModelId;
     promptOptions?: {
       promptText?: string;
       userTerms?: string;
@@ -34,7 +34,7 @@ export async function transcribeAudio(
 
     const transcriptionOptions: {
       file: fs.ReadStream;
-      model: string;
+      model: TranscriptionModelId;
       response_format: "verbose_json" | "json" | "text";
       language?: string;
       prompt?: string;

@@ -1,6 +1,10 @@
+import { TRANSCRIPTION_MODELS } from "./constants";
+
+export type TranscriptionModelId = (typeof TRANSCRIPTION_MODELS)[number]["id"];
+
 export interface Preferences {
   apiKey: string;
-  model: string;
+  model: TranscriptionModelId;
   language: string;
   promptText?: string;
   userTerms?: string;
@@ -25,7 +29,7 @@ export interface TranscriptionResult {
   audioFile?: string;
   language?: string;
   prompt?: string;
-  model?: string;
+  model?: TranscriptionModelId;
 }
 
 export enum ErrorTypes {

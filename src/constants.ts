@@ -13,7 +13,7 @@ export const TRANSCRIPTION_MODELS = [
   { id: "whisper-large-v3", name: "Whisper Large v3" },
   { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo" },
   { id: "distil-whisper-large-v3-en", name: "Distil Whisper" },
-];
+] as const;
 
 // Available language options for transcription
 export const LANGUAGE_OPTIONS = [
