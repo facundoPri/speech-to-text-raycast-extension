@@ -71,6 +71,13 @@ export default function Command() {
           title: "Transcribing...",
           message: `Language: ${languageTitle}`,
         });
+
+        let selection = "";
+        try {
+          selection = await getSelectedText();
+        } catch (error) {
+          console.error("Error getting selected text:", error);
+        }
         
         // Pass the selected language and prompt options to the transcription function
         const result = await transcribeAudio(
@@ -79,7 +86,7 @@ export default function Command() {
           {
             promptText: values.promptText,
             userTerms: values.userTerms,
-            highlightedText: values.useContext ? await getSelectedText():undefined
+            highlightedText: values.useContext ? selection : undefined
           }
         );
         setValue("transcription", result.text);
