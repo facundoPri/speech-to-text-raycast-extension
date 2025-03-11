@@ -54,7 +54,7 @@
   ],
   "dependencies": {
     "@raycast/api": "^1.93.0",
-    "@raycast/utils": "^1.17.0",
+    "@raycast/utils": "^1.19.0",
     "@types/fs-extra": "^11.0.4",
     "fs-extra": "^11.3.0",
     "groq-sdk": "^0.15.0"
