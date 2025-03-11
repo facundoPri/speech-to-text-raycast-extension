@@ -31,11 +31,52 @@ export async function transcribeAudio(filePath: string) {
       response_format: "verbose_json",
     });
 
+    // Save the transcription to a JSON file
+    await saveTranscription(filePath, transcription.text);
+
     return {
       text: transcription.text,
     };
   } catch (error) {
     console.error("Transcription error:", error);
     throw new Error(`Failed to transcribe audio: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Saves transcription result to a JSON file
+ * @param audioFilePath Path to the original audio file
+ * @param transcriptionText The transcription text
+ * @returns Path to the saved transcription file
+ */
+export async function saveTranscription(audioFilePath: string, transcriptionText: string): Promise<string> {
+  const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
+  
+  const transcriptionData = {
+    text: transcriptionText,
+    timestamp: new Date().toISOString(),
+    audioFile: audioFilePath
+  };
+  
+  await fs.writeJSON(transcriptionFilePath, transcriptionData, { spaces: 2 });
+  return transcriptionFilePath;
+}
+
+/**
+ * Loads a saved transcription from a JSON file
+ * @param audioFilePath Path to the audio file
+ * @returns Transcription data or null if not found
+ */
+export async function loadTranscription(audioFilePath: string): Promise<{ text: string; timestamp: string } | null> {
+  const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
+  
+  try {
+    if (await fs.pathExists(transcriptionFilePath)) {
+      return await fs.readJSON(transcriptionFilePath);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error loading transcription for ${audioFilePath}:`, error);
+    return null;
   }
 }

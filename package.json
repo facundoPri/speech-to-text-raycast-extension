@@ -12,6 +12,12 @@
       "title": "Speech to Text",
       "description": "Record an audio and transcribe it to text",
       "mode": "view"
+    },
+    {
+      "name": "transcription-history",
+      "title": "Transcription History",
+      "description": "View and manage your transcription history",
+      "mode": "view"
     }
   ],
   "preferences": [

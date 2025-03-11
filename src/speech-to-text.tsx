@@ -10,7 +10,8 @@ import {
   Color,
   Alert,
   confirmAlert,
-  Form 
+  Form,
+  open
 } from "@raycast/api";
 import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
@@ -298,6 +299,12 @@ export default function Command() {
                 icon={Icon.Plus}
                 onAction={handleNewRecording}
                 shortcut={{ modifiers: ["cmd"], key: "n" }}
+              />
+              <Action
+                title="View History"
+                icon={Icon.List}
+                onAction={() => open("raycast://extensions/facundo_prieto/speech-to-text/transcription-history")}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "h" }}
               />
             </ActionPanel.Section>
           )}
