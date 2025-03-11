@@ -13,13 +13,13 @@ import {
 import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
-import { Preferences } from "./types";
+import { Preferences, TranscriptionModelId } from "./types";
 import { LANGUAGE_OPTIONS, TRANSCRIPTION_MODELS } from "./constants";
 
 interface TranscriptFormValues {
   transcription: string;
   language: string;
-  model: string;
+  model: TranscriptionModelId;
   promptText: string;
   userTerms: string;
   useContext: boolean;
@@ -216,7 +216,14 @@ export default function Command() {
         ))}
       </Form.Dropdown>
 
-      <Form.Dropdown {...itemProps.model} title="Model" info="Select a model for better transcription accuracy">
+      <Form.Dropdown
+        id={itemProps.model.id}
+        title="Model"
+        info="Select a model for better transcription accuracy"
+        value={itemProps.model.value}
+        onChange={itemProps.model.onChange as (newValue: string) => void}
+        error={itemProps.model.error}
+      >
         {TRANSCRIPTION_MODELS.map((model) => (
           <Form.Dropdown.Item key={model.id} value={model.id} title={model.name} />
         ))}

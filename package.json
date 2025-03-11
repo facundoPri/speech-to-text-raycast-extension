@@ -9,8 +9,8 @@
   "license": "MIT",
   "commands": [
     {
-      "name": "speech-to-text",
-      "title": "Speech to Text",
+      "name": "record-transcription",
+      "title": "Record Transcription",
       "description": "Record an audio and transcribe it to text",
       "mode": "view"
     },
