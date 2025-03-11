@@ -7,7 +7,7 @@ import {
   buildSoxCommand,
   validateAudioFile,
 } from "../utils/audio";
-import { showToast, Toast, showHUD } from "@raycast/api";
+import { showToast, Toast } from "@raycast/api";
 import { ErrorTypes } from "../types";
 
 interface AudioRecorderHook {
@@ -199,8 +199,6 @@ export function useAudioRecorder(): AudioRecorderHook {
           message: `Duration: ${recordingDuration} seconds`,
         });
 
-        showHUD("Recording stopped");
-        
         console.log("Returning recording path:", currentRecordingPath);
         return currentRecordingPath;
       } else {
