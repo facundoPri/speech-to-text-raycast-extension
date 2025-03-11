@@ -11,5 +11,12 @@ export interface TranscriptionFile {
   recordedAt: Date;
   duration: number;
   sizeInBytes: number;
+  wordCount: number;
   transcription: string | null;
+}
+
+export interface TranscriptionResult {
+  text: string;
+  timestamp: string;
+  audioFile?: string;
 }

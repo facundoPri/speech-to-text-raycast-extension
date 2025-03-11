@@ -7,7 +7,6 @@ import {
   createRecordingProcess,
   verifyRecordingFile,
 } from "../utils/audio";
-import { RECORDING_MAX_DURATION } from "../constants";
 
 export interface AudioRecorderHook {
   isRecording: boolean;
@@ -84,7 +83,7 @@ export function useAudioRecorder(): AudioRecorderHook {
       setRecordingPath(filePath);
 
       // Start the recording process
-      recordingProcessRef.current = createRecordingProcess(soxPathRef.current, filePath, RECORDING_MAX_DURATION);
+      recordingProcessRef.current = createRecordingProcess(soxPathRef.current, filePath);
 
       // Handle process exit for max duration reached
       recordingProcessRef.current.once("close", () => {

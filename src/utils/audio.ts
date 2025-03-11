@@ -137,3 +137,39 @@ export async function cleanupOldAudioFiles(
     console.error("Error cleaning up old audio files:", error);
   }
 }
+
+async function estimateDurationFromFileSize(filePath: string): Promise<number> {
+  const { size } = await fs.stat(filePath);
+  const sampleRate = RECORDING_SAMPLE_RATE; // Use the constant from our config
+  const bytesPerSample = 2; // 16-bit audio = 2 bytes per sample
+  return Math.round(size / (sampleRate * bytesPerSample));
+}
+
+export async function getAudioDuration(filePath: string): Promise<number> {
+  try {
+    const soxPath = await checkSoxInstalled();
+    if (!soxPath) {
+      console.log("Sox not found, falling back to file size estimation");
+      return estimateDurationFromFileSize(filePath);
+    }
+
+    const stdout = await execSync(`${soxPath} --i -D "${filePath}"`);
+    const duration = parseFloat(stdout.toString().trim());
+    
+    if (isNaN(duration) || duration <= 0) {
+      throw new Error("Invalid duration returned by Sox");
+    }
+    
+    return Math.round(duration);
+  } catch (error) {
+    console.error(`Error getting duration for ${filePath}:`, error);
+    
+    try {
+      return await estimateDurationFromFileSize(filePath);
+    } catch (fallbackError) {
+      throw new Error(
+        `Failed to get audio duration: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+}

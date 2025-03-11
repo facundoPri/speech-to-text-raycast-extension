@@ -1,26 +1,27 @@
 import Groq from "groq-sdk";
 import fs from "fs-extra";
 import { getPreferenceValues } from "@raycast/api";
-import { Preferences } from "../../types";
+import { Preferences, TranscriptionResult } from "../../types";
 
 /**
  * Transcribes an audio file using Groq's API
  * @param filePath Path to the audio file
  * @returns Transcription result with text and metadata
+ * @throws Error When transcription fails
  */
-export async function transcribeAudio(filePath: string) {
+export async function transcribeAudio(filePath: string): Promise<TranscriptionResult> {
   const preferences = getPreferenceValues<Preferences>();
 
   if (!preferences.apiKey) {
     throw new Error("Groq API key is not set. Please set it in the extension preferences.");
   }
 
-  // Create a Groq client with the API key
-  const client = new Groq({
-    apiKey: preferences.apiKey,
-  });
-
   try {
+    // Create a Groq client with the API key
+    const client = new Groq({
+      apiKey: preferences.apiKey,
+    });
+
     // Read the audio file
     const fileBuffer = fs.createReadStream(filePath);
 
@@ -32,12 +33,32 @@ export async function transcribeAudio(filePath: string) {
     });
 
     // Save the transcription to a JSON file
-    await saveTranscription(filePath, transcription.text);
-
-    return {
+    const result: TranscriptionResult = {
       text: transcription.text,
+      timestamp: new Date().toISOString(),
     };
+
+    await saveTranscription(filePath, result);
+
+    return result;
   } catch (error) {
+    // Check for rate limit errors
+    if (error instanceof Error && 
+        (error.message.includes("rate limit") || 
+         error.message.includes("429") || 
+         error.message.includes("too many requests"))) {
+      throw new Error(
+        "Groq API rate limit exceeded. Please try again later or reduce the length of your audio file."
+      );
+    }
+    
+    // Handle other API errors
+    if (error instanceof Error && error.message.includes("400")) {
+      throw new Error(
+        "The API couldn't process this audio file. It might be corrupted or in an unsupported format."
+      );
+    }
+    
     console.error("Transcription error:", error);
     throw new Error(`Failed to transcribe audio: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -46,20 +67,28 @@ export async function transcribeAudio(filePath: string) {
 /**
  * Saves transcription result to a JSON file
  * @param audioFilePath Path to the original audio file
- * @param transcriptionText The transcription text
+ * @param transcriptionData The transcription data to save
  * @returns Path to the saved transcription file
+ * @throws Error When saving fails
  */
-export async function saveTranscription(audioFilePath: string, transcriptionText: string): Promise<string> {
+export async function saveTranscription(
+  audioFilePath: string, 
+  transcriptionData: TranscriptionResult
+): Promise<string> {
   const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
   
-  const transcriptionData = {
-    text: transcriptionText,
-    timestamp: new Date().toISOString(),
+  const dataToSave = {
+    ...transcriptionData,
     audioFile: audioFilePath
   };
   
-  await fs.writeJSON(transcriptionFilePath, transcriptionData, { spaces: 2 });
-  return transcriptionFilePath;
+  try {
+    await fs.writeJSON(transcriptionFilePath, dataToSave, { spaces: 2 });
+    return transcriptionFilePath;
+  } catch (error) {
+    console.error(`Error saving transcription for ${audioFilePath}:`, error);
+    throw new Error(`Failed to save transcription: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
@@ -67,7 +96,7 @@ export async function saveTranscription(audioFilePath: string, transcriptionText
  * @param audioFilePath Path to the audio file
  * @returns Transcription data or null if not found
  */
-export async function loadTranscription(audioFilePath: string): Promise<{ text: string; timestamp: string } | null> {
+export async function loadTranscription(audioFilePath: string): Promise<TranscriptionResult | null> {
   const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
   
   try {

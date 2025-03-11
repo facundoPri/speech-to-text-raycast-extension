@@ -15,24 +15,18 @@ import {
 import fs from "fs-extra";
 import path from "path";
 import { exec } from "child_process";
-import { listAudioFiles } from "./utils/audio";
+import { listAudioFiles, getAudioDuration } from "./utils/audio";
 import { transcribeAudio } from "./utils/ai/transcription";
-
-interface TranscriptionFile {
-  id: string;
-  filePath: string;
-  fileName: string;
-  recordedAt: Date;
-  duration: number;
-  sizeInBytes: number;
-  transcription: string | null;
-}
+import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
+import { TranscriptionFile } from "./types";
 
 export default function TranscriptionHistory() {
   const [files, setFiles] = useState<TranscriptionFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [activeTranscriptions, setActiveTranscriptions] = useState<Record<string, boolean>>({});
+  const [isShowingDetails, setIsShowingDetails] = useState(true);
+  
 
   const loadFiles = async () => {
     setIsLoading(true);
@@ -56,11 +50,8 @@ export default function TranscriptionHistory() {
           
           const recordedAt = dateStr ? new Date(dateStr) : new Date(stats.mtime);
           
-          // Calculate audio duration (approximation based on file size)
-          // For WAV files at 16kHz, 16-bit: duration in seconds ~= fileSize / (16000 * 2)
-          const sampleRate = 16000; // Assuming 16kHz sample rate
-          const bytesPerSample = 2; // 16-bit audio = 2 bytes per sample
-          const estimatedDuration = Math.round(stats.size / (sampleRate * bytesPerSample));
+          // Get audio duration using ffprobe
+          const duration = await getAudioDuration(filePath);
           
           // Check if there's a corresponding transcription JSON file
           const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
@@ -80,9 +71,10 @@ export default function TranscriptionHistory() {
             filePath,
             fileName,
             recordedAt,
-            duration: estimatedDuration,
+            duration,
             sizeInBytes: stats.size,
             transcription,
+            wordCount: transcription ? transcription.split(/\s+/).filter(Boolean).length : 0,
           });
         } catch (error) {
           console.error(`Error processing file ${filePath}:`, error);
@@ -108,28 +100,6 @@ export default function TranscriptionHistory() {
   useEffect(() => {
     loadFiles();
   }, []);
-
-  const formatDate = (date: Date): string => {
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   const handleTranscribe = async (file: TranscriptionFile) => {
     try {
@@ -228,7 +198,7 @@ export default function TranscriptionHistory() {
     const searchLower = searchText.toLowerCase();
     return (
       file.fileName.toLowerCase().includes(searchLower) ||
-      (file.transcription && file.transcription.toLowerCase().includes(searchLower))
+      file.transcription?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -239,6 +209,7 @@ export default function TranscriptionHistory() {
       onSearchTextChange={setSearchText}
       searchBarPlaceholder="Search recordings and transcriptions..."
       throttle
+      isShowingDetail={isShowingDetails}
     >
       <List.Section title="Recordings" subtitle={filteredFiles.length.toString()}>
         {filteredFiles.map(file => (
@@ -282,18 +253,18 @@ export default function TranscriptionHistory() {
                       icon={{ source: Icon.Document, tintColor: Color.PrimaryText }}
                     />
                     <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label
+                    <List.Item.Detail.Metadata.Link
                       title="File Path"
                       text={file.filePath}
-                      icon={{ source: Icon.Folder, tintColor: Color.PrimaryText }}
+                      target={file.filePath}
                     />
                     {file.transcription && (
                       <>
                         <List.Item.Detail.Metadata.Separator />
                         <List.Item.Detail.Metadata.Label
                           title="Word Count"
-                          text={file.transcription.split(/\s+/).filter(Boolean).length.toString()}
-                          icon={{ source: Icon.TextDocument, tintColor: Color.PrimaryText }}
+                          text={file.wordCount.toString()}
+                          icon={{ source: Icon.Document, tintColor: Color.PrimaryText }}
                         />
                       </>
                     )}
@@ -303,9 +274,15 @@ export default function TranscriptionHistory() {
             }
             actions={
               <ActionPanel>
+                <Action
+                  title={isShowingDetails ? "Hide Details" : "Show Details"}
+                  icon={isShowingDetails ? Icon.Sidebar : Icon.ChevronRight}
+                  onAction={() => setIsShowingDetails(!isShowingDetails)}
+                  shortcut={{ modifiers: ["cmd"], key: "d" }}
+                />
                 {!file.transcription && (
                   <Action
-                    title={activeTranscriptions[file.id] ? "Transcribing..." : "Transcribe"}
+                    title={activeTranscriptions[file.id] ? "Transcribing…" : "Transcribe"}
                     icon={Icon.Text}
                     onAction={() => handleTranscribe(file)}
                   />
@@ -318,7 +295,7 @@ export default function TranscriptionHistory() {
                       onAction={() => Clipboard.copy(file.transcription!)}
                     />
                     <Action
-                      title={activeTranscriptions[file.id] ? "Re-transcribing..." : "Re-transcribe"}
+                      title={activeTranscriptions[file.id] ? "Re-transcribing…" : "Re-transcribe"}
                       icon={Icon.ArrowClockwise}
                       onAction={() => handleTranscribe(file)}
                     />

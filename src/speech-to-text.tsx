@@ -16,6 +16,7 @@ import {
 import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
+import { formatDuration } from "./utils/formatting";
 
 interface TranscriptFormValues {
   transcription: string;
@@ -103,12 +104,6 @@ export default function Command() {
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const handleNewRecording = async () => {
     if (transcriptionText) {
       const shouldContinue = await confirmAlert({
@@ -174,15 +169,15 @@ export default function Command() {
     }
 
     if (viewMode === "transcript" && transcriptionText) {
-      return `# 📝 Transcription Result\n\n${transcriptionText}\n\n---\n\n*Recording duration: ${formatTime(recordingDuration)}*`;
+      return `# 📝 Transcription Result\n\n${transcriptionText}\n\n---\n\n*Recording duration: ${formatDuration(recordingDuration)}*`;
     }
 
     if (isRecording) {
-      return `# 🎙️ Recording in Progress\n\n${getRecordingIndicator()} **Recording... ${formatTime(recordingDuration)}**\n\nPress **Stop Recording** when you're done.`;
+      return `# 🎙️ Recording in Progress\n\n${getRecordingIndicator()} **Recording... ${formatDuration(recordingDuration)}**\n\nPress **Stop Recording** when you're done.`;
     }
 
     if (viewMode === "recording" && recordingPath && !transcriptionText) {
-      return `# ✅ Recording Complete\n\n**Recording saved to:** \`${recordingPath}\`\n\n**Duration:** ${formatTime(recordingDuration)}\n\nPress **Transcribe** to convert your audio to text.`;
+      return `# ✅ Recording Complete\n\n**Recording saved to:** \`${recordingPath}\`\n\n**Duration:** ${formatDuration(recordingDuration)}\n\nPress **Transcribe** to convert your audio to text.`;
     }
 
     return `# 🎤 Speech to Text\n\nWelcome to Speech to Text! This extension allows you to record audio and transcribe it to text using Groq's API.\n\n## Getting Started\n\n1. Press **Start Recording** to begin capturing audio\n2. Speak clearly into your microphone\n3. Press **Stop Recording** when you're done\n4. Press **Transcribe** to convert your audio to text\n\n*Keyboard Shortcuts*\n- Start Recording: ⌘ + R\n- Stop Recording: ⌘ + S\n- Transcribe: ⌘ + T\n- Copy Text: ⌘ + C`;
@@ -206,7 +201,7 @@ export default function Command() {
           <Detail.Metadata>
             <Detail.Metadata.Label
               title="Duration"
-              text={formatTime(recordingDuration)}
+              text={formatDuration(recordingDuration)}
               icon={{ source: Icon.Clock, tintColor: Color.PrimaryText }}
             />
             <Detail.Metadata.Separator />
@@ -224,7 +219,7 @@ export default function Command() {
           <Detail.Metadata>
             <Detail.Metadata.Label
               title="Duration"
-              text={formatTime(recordingDuration)}
+              text={formatDuration(recordingDuration)}
               icon={{ source: Icon.Clock, tintColor: Color.Red }}
             />
             <Detail.Metadata.Separator />
@@ -236,7 +231,7 @@ export default function Command() {
           <Detail.Metadata>
             <Detail.Metadata.Label
               title="Duration"
-              text={formatTime(recordingDuration)}
+              text={formatDuration(recordingDuration)}
               icon={{ source: Icon.Clock, tintColor: Color.PrimaryText }}
             />
             <Detail.Metadata.Separator />
