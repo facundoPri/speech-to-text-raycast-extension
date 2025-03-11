@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "speech-to-text",
-  "title": "Speech to text",
-  "description": "A simple extension that allow speech to text using your own groq api",
+  "title": "Speech to Text",
+  "description": "A simple extension that allows speech to text using your own groq api",
   "icon": "extension-icon.png",
   "author": "facundo_prieto",
   "license": "MIT",
@@ -10,13 +10,54 @@
     {
       "name": "speech-to-text",
       "title": "Speech to Text",
-      "description": "",
-      "mode": "no-view"
+      "description": "Record an audio and transcribe it to text",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "apiKey",
+      "title": "Groq API Key",
+      "description": "Your Groq API key for speech-to-text transcription",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "model",
+      "title": "Transcription Model",
+      "description": "The Groq model to use for transcription",
+      "type": "dropdown",
+      "required": true,
+      "default": "whisper-large-v3-turbo",
+      "data": [
+        {
+          "title": "Whisper Large v3",
+          "value": "whisper-large-v3"
+        },
+        {
+          "title": "Whisper Large v3 Turbo",
+          "value": "whisper-large-v3-turbo"
+        },
+        {
+          "title": "Distil Whisper",
+          "value": "distil-whisper"
+        }
+      ]
+    },
+    {
+      "name": "tempDirectory",
+      "title": "Temporary Directory",
+      "description": "Directory to store temporary audio recordings",
+      "type": "directory",
+      "required": false
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.93.0",
-    "@raycast/utils": "^1.17.0"
+    "@raycast/utils": "^1.17.0",
+    "@types/fs-extra": "^11.0.4",
+    "fs-extra": "^11.3.0",
+    "groq-sdk": "^0.15.0"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.11",
