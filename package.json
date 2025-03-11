@@ -51,6 +51,60 @@
       ]
     },
     {
+      "name": "language",
+      "title": "Default Language",
+      "description": "Selecting a specific language can improve transcription accuracy",
+      "type": "dropdown",
+      "required": true,
+      "default": "auto",
+      "data": [
+        {
+          "title": "Auto-detect (default)",
+          "value": "auto"
+        },
+        {
+          "title": "English",
+          "value": "en"
+        },
+        {
+          "title": "Spanish",
+          "value": "es"
+        },
+        {
+          "title": "French",
+          "value": "fr"
+        },
+        {
+          "title": "German",
+          "value": "de"
+        },
+        {
+          "title": "Italian",
+          "value": "it"
+        },
+        {
+          "title": "Portuguese",
+          "value": "pt"
+        },
+        {
+          "title": "Chinese",
+          "value": "zh"
+        },
+        {
+          "title": "Japanese",
+          "value": "ja"
+        },
+        {
+          "title": "Korean",
+          "value": "ko"
+        },
+        {
+          "title": "Russian",
+          "value": "ru"
+        }
+      ]
+    },
+    {
       "name": "tempDirectory",
       "title": "Temporary Directory",
       "description": "Directory to store temporary audio recordings",

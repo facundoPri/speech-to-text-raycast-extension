@@ -6,10 +6,11 @@ import { Preferences, TranscriptionResult } from "../../types";
 /**
  * Transcribes an audio file using Groq's API
  * @param filePath Path to the audio file
+ * @param overrideLanguage Optional language to override the preference setting
  * @returns Transcription result with text and metadata
  * @throws Error When transcription fails
  */
-export async function transcribeAudio(filePath: string): Promise<TranscriptionResult> {
+export async function transcribeAudio(filePath: string, overrideLanguage?: string): Promise<TranscriptionResult> {
   const preferences = getPreferenceValues<Preferences>();
 
   if (!preferences.apiKey) {
@@ -25,12 +26,28 @@ export async function transcribeAudio(filePath: string): Promise<TranscriptionRe
     // Read the audio file
     const fileBuffer = fs.createReadStream(filePath);
 
-    // Create a transcription of the audio file
-    const transcription = await client.audio.transcriptions.create({
+    // Create a transcription request with optional language parameter
+    const transcriptionOptions: {
+      file: fs.ReadStream;
+      model: string;
+      response_format: "verbose_json" | "json" | "text";
+      language?: string;
+    } = {
       file: fileBuffer,
       model: preferences.model || "whisper-large-v3-turbo",
       response_format: "verbose_json",
-    });
+    };
+
+    // Use the override language if provided, otherwise use preferences
+    const language = overrideLanguage ?? preferences.language;
+    
+    // Add language parameter if it's not set to auto
+    if (language && language !== "auto") {
+      transcriptionOptions.language = language;
+    }
+
+    // Create a transcription of the audio file
+    const transcription = await client.audio.transcriptions.create(transcriptionOptions);
 
     // Save the transcription to a JSON file
     const result: TranscriptionResult = {
