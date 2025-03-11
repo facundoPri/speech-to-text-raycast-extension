@@ -39,9 +39,7 @@ export function useAudioRecorder(): AudioRecorderHook {
     checkSox();
 
     return () => {
-      if (isRecording) {
-        stopRecording();
-      }
+      if (isRecording) void stopRecording();
     };
   }, []);
 
