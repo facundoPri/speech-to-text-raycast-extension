@@ -11,12 +11,13 @@ import {
   Alert,
   confirmAlert,
   trash,
+  showInFinder,
 } from "@raycast/api";
 import fs from "fs-extra";
 import path from "path";
 import { exec } from "child_process";
 import { listAudioFiles, getAudioDuration } from "./utils/audio";
-import { transcribeAudio } from "./utils/ai/transcription";
+import { saveTranscription, transcribeAudio } from "./utils/ai/transcription";
 import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
 import { TranscriptionFile } from "./types";
 
@@ -24,9 +25,8 @@ export default function TranscriptionHistory() {
   const [files, setFiles] = useState<TranscriptionFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [activeTranscriptions, setActiveTranscriptions] = useState<Record<string, boolean>>({});
   const [isShowingDetails, setIsShowingDetails] = useState(true);
-  
+
 
   const loadFiles = async () => {
     setIsLoading(true);
@@ -39,7 +39,7 @@ export default function TranscriptionHistory() {
         try {
           const stats = await fs.stat(filePath);
           const fileName = path.basename(filePath);
-          
+
           // Extract timestamp from filename (format: recording-YYYY-MM-DDThh-mm-ss-xxxZ.wav)
           const dateMatch = fileName.match(/recording-(.+)\.wav$/);
           const dateStr = dateMatch ? dateMatch[1].replace(/-/g, (match, offset) => {
@@ -47,16 +47,16 @@ export default function TranscriptionHistory() {
             if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
             return "-"; // Date separators
           }) : "";
-          
+
           const recordedAt = dateStr ? new Date(dateStr) : new Date(stats.mtime);
-          
+
           // Get audio duration using ffprobe
           const duration = await getAudioDuration(filePath);
-          
+
           // Check if there's a corresponding transcription JSON file
           const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
           let transcription = null;
-          
+
           if (await fs.pathExists(transcriptionFilePath)) {
             try {
               const transcriptionData = await fs.readJSON(transcriptionFilePath);
@@ -65,7 +65,7 @@ export default function TranscriptionHistory() {
               console.error(`Error reading transcription file ${transcriptionFilePath}:`, error);
             }
           }
-          
+
           transcriptionFiles.push({
             id: fileName,
             filePath,
@@ -80,10 +80,10 @@ export default function TranscriptionHistory() {
           console.error(`Error processing file ${filePath}:`, error);
         }
       }
-      
+
       // Sort by recording date (newest first)
       transcriptionFiles.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
-      
+
       setFiles(transcriptionFiles);
     } catch (error) {
       console.error("Error loading audio files:", error);
@@ -101,10 +101,17 @@ export default function TranscriptionHistory() {
     loadFiles();
   }, []);
 
+  const copyTranscription = async (text: string) => {
+    await Clipboard.copy(text);
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Transcription Copied",
+      message: "Text copied to clipboard",
+    });
+  };
+
   const handleTranscribe = async (file: TranscriptionFile) => {
     try {
-      setActiveTranscriptions(prev => ({ ...prev, [file.id]: true }));
-      
       await showToast({
         style: Toast.Style.Animated,
         title: "Transcribing...",
@@ -112,42 +119,27 @@ export default function TranscriptionHistory() {
       });
 
       const result = await transcribeAudio(file.filePath);
-      
-      // Save transcription to JSON file
-      const transcriptionFilePath = file.filePath.replace(/\.wav$/, ".json");
-      await fs.writeJSON(transcriptionFilePath, { 
-        text: result.text,
-        timestamp: new Date().toISOString() 
-      });
-      
+      await saveTranscription(file.filePath, result);
+
       // Update file list
-      setFiles(prevFiles => 
-        prevFiles.map(f => 
-          f.id === file.id 
-            ? { ...f, transcription: result.text } 
+      setFiles(prevFiles =>
+        prevFiles.map(f =>
+          f.id === file.id
+            ? { ...f, transcription: result.text, wordCount: result.text.split(/\s+/).filter(Boolean).length }
             : f
         )
       );
 
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Transcription Complete",
-        message: "Text copied to clipboard",
-      });
+      await copyTranscription(result.text);
 
-      // Copy to clipboard
-      await Clipboard.copy(result.text);
-      
     } catch (error) {
       console.error("Transcription error:", error);
-      
+
       await showToast({
         style: Toast.Style.Failure,
         title: "Transcription Failed",
         message: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      setActiveTranscriptions(prev => ({ ...prev, [file.id]: false }));
     }
   };
 
@@ -166,16 +158,16 @@ export default function TranscriptionHistory() {
     try {
       // Delete the audio file
       await trash(file.filePath);
-      
+
       // Delete the transcription file if it exists
       const transcriptionFilePath = file.filePath.replace(/\.wav$/, ".json");
       if (await fs.pathExists(transcriptionFilePath)) {
         await trash(transcriptionFilePath);
       }
-      
+
       // Update the file list
       setFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
-      
+
       await showToast({
         style: Toast.Style.Success,
         title: "Recording Deleted",
@@ -183,7 +175,7 @@ export default function TranscriptionHistory() {
       });
     } catch (error) {
       console.error("Error deleting file:", error);
-      
+
       await showToast({
         style: Toast.Style.Failure,
         title: "Delete Failed",
@@ -194,7 +186,7 @@ export default function TranscriptionHistory() {
 
   const filteredFiles = files.filter(file => {
     if (!searchText) return true;
-    
+
     const searchLower = searchText.toLowerCase();
     return (
       file.fileName.toLowerCase().includes(searchLower) ||
@@ -216,25 +208,36 @@ export default function TranscriptionHistory() {
           <List.Item
             key={file.id}
             title={formatDate(file.recordedAt)}
-            subtitle={file.transcription ? "Transcribed" : "Not transcribed"}
             accessories={[
               { text: formatDuration(file.duration) },
               { text: formatFileSize(file.sizeInBytes) },
-              { 
-                tag: { 
+              {
+                tag: {
                   value: file.transcription ? "Transcribed" : "Audio Only",
                   color: file.transcription ? Color.Green : Color.Orange
-                } 
+                }
               }
             ]}
             detail={
               <List.Item.Detail
-                markdown={file.transcription 
-                  ? `# Transcription\n\n${file.transcription}` 
-                  : "# No Transcription\n\nThis recording hasn't been transcribed yet. Use the Transcribe action to generate a transcription."
+                markdown={file.transcription
+                  ? `# Transcription:\n\n${file.transcription}`
+                  : "# No Transcription\n\nThis recording hasn't been transcribed yet. Use the Transcribe action (⌘T) to generate a transcription."
                 }
                 metadata={
                   <List.Item.Detail.Metadata>
+                    <List.Item.Detail.Metadata.TagList
+                      title="File Name"
+                    >
+                      <List.Item.Detail.Metadata.TagList.Item
+                        text={file.fileName}
+                        icon={{ source: Icon.Document, tintColor: Color.PrimaryText }}
+                        onAction={() => {
+                          showInFinder(file.filePath);
+                        }}
+                      />
+                    </List.Item.Detail.Metadata.TagList>
+                    <List.Item.Detail.Metadata.Separator />
                     <List.Item.Detail.Metadata.Label
                       title="Recorded On"
                       text={formatDate(file.recordedAt)}
@@ -251,12 +254,6 @@ export default function TranscriptionHistory() {
                       title="File Size"
                       text={formatFileSize(file.sizeInBytes)}
                       icon={{ source: Icon.Document, tintColor: Color.PrimaryText }}
-                    />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Link
-                      title="File Path"
-                      text={file.filePath}
-                      target={file.filePath}
                     />
                     {file.transcription && (
                       <>
@@ -282,22 +279,25 @@ export default function TranscriptionHistory() {
                 />
                 {!file.transcription && (
                   <Action
-                    title={activeTranscriptions[file.id] ? "Transcribing…" : "Transcribe"}
+                    title={"Transcribe"}
                     icon={Icon.Text}
                     onAction={() => handleTranscribe(file)}
+                    shortcut={{ modifiers: ["cmd"], key: "return" }}
                   />
                 )}
                 {file.transcription && (
                   <ActionPanel.Section title="Transcription Actions">
                     <Action
-                      title="Copy Transcription"
-                      icon={Icon.Clipboard}
-                      onAction={() => Clipboard.copy(file.transcription!)}
-                    />
-                    <Action
-                      title={activeTranscriptions[file.id] ? "Re-transcribing…" : "Re-transcribe"}
+                      title={"Re-transcribe"}
                       icon={Icon.ArrowClockwise}
                       onAction={() => handleTranscribe(file)}
+                      shortcut={{ modifiers: ["cmd"], key: "return" }}
+                    />
+                    <Action
+                      title="Copy Transcription"
+                      icon={Icon.Clipboard}
+                      onAction={() => copyTranscription(file.transcription!)}
+                      shortcut={{ modifiers: ["cmd"], key: "c" }}
                     />
                   </ActionPanel.Section>
                 )}
