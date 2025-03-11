@@ -12,6 +12,9 @@ import {
   confirmAlert,
   trash,
   showInFinder,
+  useNavigation,
+  Form,
+  getPreferenceValues,
 } from "@raycast/api";
 import fs from "fs-extra";
 import path from "path";
@@ -19,9 +22,11 @@ import { exec } from "child_process";
 import { listAudioFiles, getAudioDuration } from "./utils/audio";
 import { saveTranscription, transcribeAudio, loadTranscription } from "./utils/ai/transcription";
 import { formatDate, formatDuration, formatFileSize } from "./utils/formatting";
-import { TranscriptionFile } from "./types";
+import { TranscriptionFile, TranscriptionResult, Preferences } from "./types";
+import { LANGUAGE_OPTIONS } from "./constants";
 
 export default function TranscriptionHistory() {
+  const { push } = useNavigation();
   const [files, setFiles] = useState<TranscriptionFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
@@ -110,39 +115,68 @@ export default function TranscriptionHistory() {
     });
   };
 
+  // Helper function to perform the actual transcription
+  const performTranscription = async (file: TranscriptionFile, transcriptionData: TranscriptionResult | null) => {
+    await showToast({
+      style: Toast.Style.Animated,
+      title: "Transcribing...",
+      message: file.fileName,
+    });
+    // Re-transcribe using the provided language and prompt
+    const result = await transcribeAudio(
+      file.filePath,
+      {
+        overrideLanguage: transcriptionData?.language,
+        overridePrompt: transcriptionData?.prompt
+      }
+    );
+    
+    await saveTranscription(file.filePath, result);
+
+    // Update file list
+    setFiles(prevFiles =>
+      prevFiles.map(f =>
+        f.id === file.id
+          ? { ...f, transcription: result.text, wordCount: result.text.split(/\s+/).filter(Boolean).length }
+          : f
+      )
+    );
+
+    await copyTranscription(result.text);
+  };
+
   const handleTranscribe = async (file: TranscriptionFile) => {
     try {
       // Load existing transcription data to get language and prompt
       const existingTranscription = await loadTranscription(file.filePath);
-      
-      await showToast({
-        style: Toast.Style.Animated,
-        title: "Transcribing...",
-        message: file.fileName,
+      let useOriginalSettings = true;
+      // Show confirmation dialog with options to modify settings
+      if (existingTranscription) {
+      useOriginalSettings = await confirmAlert({
+        title: "Re-transcribe Audio",
+        message: "Do you want to use the original settings or modify them?",
+        primaryAction: {
+          title: "Use Original Settings",
+        },
+        dismissAction: {
+          title: "Modify Settings",
+        },
       });
+      }
       
-      // Re-transcribe using the original language and prompt if available
-      const result = await transcribeAudio(
-        file.filePath,
-        {
-          overrideLanguage: existingTranscription?.language,
-          overridePrompt: existingTranscription?.prompt
-        }
-      );
-      
-      await saveTranscription(file.filePath, result);
-
-      // Update file list
-      setFiles(prevFiles =>
-        prevFiles.map(f =>
-          f.id === file.id
-            ? { ...f, transcription: result.text, wordCount: result.text.split(/\s+/).filter(Boolean).length }
-            : f
-        )
-      );
-
-      await copyTranscription(result.text);
-
+      if (useOriginalSettings) {
+        // Use original settings
+        await performTranscription(file, existingTranscription);
+      } else {
+        // Navigate to the settings modification view
+        push(
+          <TranscriptionSettingsForm 
+            file={file} 
+            existingTranscription={existingTranscription} 
+            onTranscribe={performTranscription} 
+          />
+        );
+      }
     } catch (error) {
       console.error("Transcription error:", error);
 
@@ -342,5 +376,81 @@ export default function TranscriptionHistory() {
         ))}
       </List.Section>
     </List>
+  );
+}
+
+// Component for modifying transcription settings
+function TranscriptionSettingsForm({ 
+  file, 
+  existingTranscription, 
+  onTranscribe 
+}: { 
+  file: TranscriptionFile; 
+  existingTranscription: TranscriptionResult | null;
+  onTranscribe: (file: TranscriptionFile, transcription: TranscriptionResult | null) => Promise<void>;
+}) {
+  const { pop } = useNavigation();
+  const preferences = getPreferenceValues<Preferences>();
+  
+  // Form state
+  const [language, setLanguage] = useState<string>(
+    existingTranscription?.language ?? preferences.language ?? "auto"
+  );
+  const [promptText, setPromptText] = useState<string>(
+    existingTranscription?.prompt ?? preferences.promptText ?? ""
+  );
+  
+  // Handle form submission
+  const handleSubmit = async () => {
+    
+    // Create a modified transcription object with the new settings
+    const modifiedTranscription: TranscriptionResult = {
+      ...(existingTranscription || {}),
+      text: existingTranscription?.text ?? "",
+      timestamp: existingTranscription?.timestamp ?? new Date().toISOString(),
+      language,
+      prompt: promptText,
+    };
+    
+    // Go back to the previous screen
+    pop();
+    
+    // Perform transcription with modified settings
+    await onTranscribe(file, modifiedTranscription);
+  };
+  
+  return (
+    <Form
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Transcribe" onSubmit={handleSubmit} />
+          <Action title="Cancel" onAction={pop} shortcut={{ modifiers: ["cmd"], key: "escape" }} />
+        </ActionPanel>
+      }
+    >
+      <Form.Dropdown
+        id="language"
+        title="Language"
+        value={language}
+        onChange={setLanguage}
+      >
+        {LANGUAGE_OPTIONS.map(option => (
+          <Form.Dropdown.Item 
+            key={option.value} 
+            value={option.value} 
+            title={option.title} 
+          />
+        ))}
+      </Form.Dropdown>
+      
+      <Form.TextArea
+        id="promptText"
+        title="Prompt"
+        placeholder="Custom instructions to guide the AI transcription"
+        value={promptText}
+        onChange={setPromptText}
+        info="Instructions for how the AI should approach the transcription"
+      />
+    </Form>
   );
 }
