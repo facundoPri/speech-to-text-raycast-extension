@@ -5,6 +5,7 @@
   "description": "A simple extension that allows speech to text using your own groq api",
   "icon": "extension-icon.png",
   "author": "facundo_prieto",
+  "categories": ["Productivity", "Media", "Developer Tools", "Communication"],
   "license": "MIT",
   "commands": [
     {
