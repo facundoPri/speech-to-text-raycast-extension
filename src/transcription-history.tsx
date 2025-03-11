@@ -46,7 +46,8 @@ export default function TranscriptionHistory() {
           const fileName = path.basename(filePath);
 
           // Extract timestamp from filename (format: recording-YYYY-MM-DDThh-mm-ss-xxxZ.wav)
-          const dateMatch = fileName.match(/recording-(.+)\.wav$/);
+          const regex = /recording-(.+)\.wav$/;
+          const dateMatch = regex.exec(fileName);
           const dateStr = dateMatch ? dateMatch[1].replace(/-/g, (match, offset) => {
             if (offset === 10) return "T"; // After date
             if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
@@ -55,10 +56,8 @@ export default function TranscriptionHistory() {
 
           const recordedAt = dateStr ? new Date(dateStr) : new Date(stats.mtime);
 
-          // Get audio duration using ffprobe
           const duration = await getAudioDuration(filePath);
 
-          // Check if there's a corresponding transcription JSON file
           const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
           let transcription = null;
 
@@ -86,7 +85,6 @@ export default function TranscriptionHistory() {
         }
       }
 
-      // Sort by recording date (newest first)
       transcriptionFiles.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
 
       setFiles(transcriptionFiles);
@@ -115,7 +113,6 @@ export default function TranscriptionHistory() {
     });
   };
 
-  // Helper function to perform the actual transcription
   const performTranscription = async (file: TranscriptionFile, transcriptionData: TranscriptionResult | null) => {
     await showToast({
       style: Toast.Style.Animated,
@@ -123,7 +120,6 @@ export default function TranscriptionHistory() {
       message: file.fileName,
     });
     
-    // Re-transcribe using the provided language, prompt, and model
     const result = await transcribeAudio(
       file.filePath,
       {
@@ -135,7 +131,6 @@ export default function TranscriptionHistory() {
     
     await saveTranscription(file.filePath, result);
 
-    // Update file list
     setFiles(prevFiles =>
       prevFiles.map(f =>
         f.id === file.id
@@ -149,10 +144,9 @@ export default function TranscriptionHistory() {
 
   const handleTranscribe = async (file: TranscriptionFile) => {
     try {
-      // Load existing transcription data to get language and prompt
       const existingTranscription = await loadTranscription(file.filePath);
       let useOriginalSettings = true;
-      // Show confirmation dialog with options to modify settings
+
       if (existingTranscription) {
       useOriginalSettings = await confirmAlert({
         title: "Re-transcribe Audio",
@@ -167,10 +161,8 @@ export default function TranscriptionHistory() {
       }
       
       if (useOriginalSettings) {
-        // Use original settings
         await performTranscription(file, existingTranscription);
       } else {
-        // Navigate to the settings modification view
         push(
           <TranscriptionSettingsForm 
             file={file} 
@@ -203,16 +195,13 @@ export default function TranscriptionHistory() {
     if (!shouldDelete) return;
 
     try {
-      // Delete the audio file
       await trash(file.filePath);
 
-      // Delete the transcription file if it exists
       const transcriptionFilePath = file.filePath.replace(/\.wav$/, ".json");
       if (await fs.pathExists(transcriptionFilePath)) {
         await trash(transcriptionFilePath);
       }
 
-      // Update the file list
       setFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
 
       await showToast({
@@ -381,7 +370,6 @@ export default function TranscriptionHistory() {
   );
 }
 
-// Component for modifying transcription settings
 function TranscriptionSettingsForm({ 
   file, 
   existingTranscription, 
@@ -394,7 +382,6 @@ function TranscriptionSettingsForm({
   const { pop } = useNavigation();
   const preferences = getPreferenceValues<Preferences>();
   
-  // Form state
   const [language, setLanguage] = useState<string>(
     existingTranscription?.language ?? preferences.language ?? "auto"
   );
@@ -405,12 +392,9 @@ function TranscriptionSettingsForm({
     existingTranscription?.model ?? preferences.model
   );
   
-  // Handle form submission
   const handleSubmit = async () => {
-    // Build the complete prompt from components
     const prompt = existingTranscription?.prompt ?? buildCompletePrompt(promptText, preferences.userTerms);
     
-    // Create a modified transcription object with the new settings
     const modifiedTranscription: TranscriptionResult = {
       ...(existingTranscription || {}),
       text: existingTranscription?.text ?? "",
@@ -420,10 +404,8 @@ function TranscriptionSettingsForm({
       model,
     };
     
-    // Go back to the previous screen
     pop();
     
-    // Perform transcription with modified settings
     await onTranscribe(file, modifiedTranscription);
   };
   

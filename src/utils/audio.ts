@@ -6,29 +6,16 @@ import { AudioValidationResult, ErrorTypes } from "../types";
 
 const MIN_VALID_FILE_SIZE = 1024; // 1KB
 
-/**
- * Ensures the temporary directory exists
- * @param directory Directory path to ensure
- */
 export async function ensureTempDirectory(directory: string = DEFAULT_TEMP_DIR): Promise<string> {
   await fs.ensureDir(directory);
   return directory;
 }
 
-/**
- * Generates a unique filename for recording
- * @param directory Directory to save the file
- * @returns Full path to the new file
- */
 export function generateAudioFilename(directory: string = DEFAULT_TEMP_DIR): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   return path.join(directory, `recording-${timestamp}.${RECORDING_FILE_FORMAT}`);
 }
 
-/**
- * Check if Sox is installed and return the path
- * @returns Path to Sox executable or null if not found
- */
 export async function checkSoxInstalled(): Promise<string | null> {
   try {
     // Try multiple ways to find Sox
@@ -48,11 +35,6 @@ export async function checkSoxInstalled(): Promise<string | null> {
   }
 }
 
-/**
- * Lists all audio files in the temp directory
- * @param directory Directory to list files from
- * @returns Array of file paths
- */
 export async function listAudioFiles(directory: string = DEFAULT_TEMP_DIR): Promise<string[]> {
   await ensureTempDirectory(directory);
   const files = await fs.readdir(directory);
@@ -62,19 +44,12 @@ export async function listAudioFiles(directory: string = DEFAULT_TEMP_DIR): Prom
   return audioFiles;
 }
 
-/**
- * Validates an audio file to ensure it exists and has content
- * @param filePath Path to the audio file
- * @returns Object with validation result and optional error message
- */
 export async function validateAudioFile(filePath: string): Promise<AudioValidationResult> {
   try {
-    // Check if file exists
     if (!await fs.pathExists(filePath)) {
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_MISSING };
     }
     
-    // Check file size
     const stats = await fs.stat(filePath);
     if (stats.size === 0) {
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_EMPTY };
@@ -84,11 +59,9 @@ export async function validateAudioFile(filePath: string): Promise<AudioValidati
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_TOO_SMALL };
     }
     
-    // Try to validate with Sox if possible
     const soxPath = await checkSoxInstalled();
     if (soxPath) {
       try {
-        // This will throw an error if the file is not a valid audio file
         execSync(`${soxPath} --i "${filePath}"`, { stdio: 'pipe' });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -146,19 +119,14 @@ export async function getAudioDuration(filePath: string): Promise<number> {
   }
 }
 
-/**
- * Builds the Sox command arguments for recording
- * @param outputPath Path where the recording will be saved
- * @returns Array of command arguments for Sox
- */
 export function buildSoxCommand(outputPath: string): string[] {
   return [
-    "-d",                // Use default audio input device
+    "-d",
     "-c", String(SOX_CONFIG.CHANNELS),
     "-r", String(RECORDING_SAMPLE_RATE),
     "-b", String(SOX_CONFIG.BIT_DEPTH),
     "-e", SOX_CONFIG.ENCODING,
-    "-V" + String(SOX_CONFIG.VERBOSE_LEVEL), // Verbose level for better error reporting
-    outputPath           // Output file path
+    "-V" + String(SOX_CONFIG.VERBOSE_LEVEL),
+    outputPath
   ];
 }

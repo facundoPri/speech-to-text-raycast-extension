@@ -29,11 +29,9 @@ export default function Command() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const preferences = getPreferenceValues<Preferences>();
 
-  // Use our audio recorder hook
   const { isRecording, recordingDuration, error, startRecording, stopRecording } =
     useAudioRecorder();
 
-  // Form for transcription
   const { handleSubmit, itemProps, setValue, values } = useForm<TranscriptFormValues>({
     onSubmit: (values) => {
       Clipboard.copy(values.transcription);
@@ -61,13 +59,11 @@ export default function Command() {
         setIsTranscribing(true);
         
         
-        // Determine the language title for the toast
         const languageTitle = values.language === "auto" 
           ? "Auto-detect" 
           : LANGUAGE_OPTIONS.find(option => option.value === values.language)?.title ?? "Auto-detect";
         
         
-        // Show a toast with transcription info
         await showToast({
           style: Toast.Style.Animated,
           title: "Transcribing...",
@@ -81,7 +77,6 @@ export default function Command() {
           console.error("Error getting selected text:", error);
         }
         
-        // Pass the selected language and prompt options to the transcription function
         const result = await transcribeAudio(
           recordingFilePath, 
           {
@@ -96,7 +91,6 @@ export default function Command() {
         );
         setValue("transcription", result.text);
         
-        // Copy to clipboard automatically
         await Clipboard.copy(result.text);
         
         await showToast({
@@ -122,7 +116,6 @@ export default function Command() {
     startRecording();
   };
   
-  // Handle errors
   useEffect(() => {
     if (error) {
       showToast({
@@ -133,14 +126,12 @@ export default function Command() {
     }
   }, [error]);
 
-  // Format recording duration nicely
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get appropriate placeholder text
   const getPlaceholder = () => {
     if (isRecording) {
       return `Recording in progress... (${formatDuration(recordingDuration)})`;
@@ -151,7 +142,6 @@ export default function Command() {
     return "Start recording with ⌘+R";
   };
 
-  // Get form title with status indicator
   const getTitle = () => {
     if (isRecording) {
       return "Recording";
@@ -214,7 +204,6 @@ export default function Command() {
 
       <Form.Separator />
 
-      {/* Prompt field for custom instructions */}
       <Form.TextArea
         {...itemProps.promptText}
         title="Prompt"
@@ -222,7 +211,6 @@ export default function Command() {
         info="Instructions for how the AI should approach the transcription"
       />
       
-      {/* Terms field for specialized vocabulary */}
       <Form.TextField
         {...itemProps.userTerms}
         title="Custom Terms"
@@ -230,7 +218,6 @@ export default function Command() {
         info="Comma-separated list of specialized terms, names, or jargon"
       />
       
-      {/* Context checkbox */}
       <Form.Checkbox
         {...itemProps.useContext}
         title="Use Highlighted Text"
@@ -238,7 +225,6 @@ export default function Command() {
         info="Uses any text you have highlighted in another app as context for transcription"
       />
       
-      {/* Language dropdown for quick selection */}
       <Form.Dropdown
         {...itemProps.language}
         title="Language"
@@ -253,7 +239,6 @@ export default function Command() {
         ))}
       </Form.Dropdown>
       
-      {/* Model dropdown for quick selection */}
       <Form.Dropdown
         {...itemProps.model}
         title="Model"

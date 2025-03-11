@@ -44,12 +44,10 @@ export function buildCompletePrompt(
 ): string {
   const parts: string[] = [];
   
-  // Add custom prompt if provided
   if (promptText && promptText.trim() !== "") {
     parts.push(promptText.trim());
   }
   
-  // Add terms dictionary if provided
   if (userTerms && userTerms.trim() !== "") {
     const termsArray = userTerms.split(",").map(term => term.trim()).filter(term => term !== "");
     if (termsArray.length > 0) {
@@ -57,7 +55,6 @@ export function buildCompletePrompt(
     }
   }
   
-  // Add highlighted text as context if requested and available
   if (highlightedText && highlightedText.trim() !== "") {
     parts.push(`Use the following text as context for the transcription:\n "${highlightedText.trim()}"`);
   }

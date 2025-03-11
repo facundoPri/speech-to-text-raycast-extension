@@ -19,10 +19,6 @@ interface AudioRecorderHook {
   stopRecording: () => Promise<string | null>;
 }
 
-/**
- * Hook for recording audio using Sox
- * @returns AudioRecorderHook
- */
 export function useAudioRecorder(): AudioRecorderHook {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
@@ -32,7 +28,6 @@ export function useAudioRecorder(): AudioRecorderHook {
   const recordingProcess = useRef<ChildProcess | null>(null);
   const durationInterval = useRef<NodeJS.Timeout | null>(null);
   
-  // Check Sox installation on mount
   useEffect(() => {
     const checkSox = async () => {
       const soxPath = await checkSoxInstalled();
@@ -43,7 +38,6 @@ export function useAudioRecorder(): AudioRecorderHook {
     
     checkSox();
     
-    // Cleanup on unmount
     return () => {
       if (isRecording) {
         stopRecording();
@@ -51,9 +45,6 @@ export function useAudioRecorder(): AudioRecorderHook {
     };
   }, []);
 
-  /**
-   * Shows a toast notification for an error without setting the error state
-   */
   const showErrorToast = async (title: string, message: string): Promise<void> => {
     await showToast({
       style: Toast.Style.Failure,
@@ -62,21 +53,14 @@ export function useAudioRecorder(): AudioRecorderHook {
     });
   };
   
-  /**
-   * Start recording audio
-   * @returns Promise<string | null> Path to the recording file or null if failed
-   */
   const startRecording = async (): Promise<string | null> => {
-    // Clear any previous errors
     setError(null);
     
-    // Check if already recording
     if (isRecording) {
       await showErrorToast("Already Recording", "A recording is already in progress");
       return null;
     }
     
-    // Check if Sox is installed
     const soxPath = await checkSoxInstalled();
     if (!soxPath) {
       setError(ErrorTypes.SOX_NOT_INSTALLED);
@@ -84,17 +68,14 @@ export function useAudioRecorder(): AudioRecorderHook {
     }
     
     try {
-      // Generate a unique filename
       const tempDir = await ensureTempDirectory();
       const outputPath = generateAudioFilename(tempDir);
       console.log("Recording to file:", outputPath);
       setRecordingPath(outputPath);
       
-      // Start recording using Sox
       console.log("Starting recording with Sox");
       recordingProcess.current = spawn(soxPath, buildSoxCommand(outputPath));
       
-      // Add event listeners for debugging
       recordingProcess.current.stdout?.on('data', (data) => {
         console.log(`Sox stdout: ${data}`);
       });
@@ -107,7 +88,6 @@ export function useAudioRecorder(): AudioRecorderHook {
         console.error(`Sox process error: ${error.message}`);
         setError(`${ErrorTypes.RECORDING_PROCESS_ERROR}: ${error.message}`);
         
-        // Cleanup
         if (durationInterval.current) {
           clearInterval(durationInterval.current);
           durationInterval.current = null;
@@ -119,11 +99,9 @@ export function useAudioRecorder(): AudioRecorderHook {
       recordingProcess.current?.on('close', (code) => {
         console.log(`Sox process exited with code ${code}`);
         
-        // If code is non-zero and we're still recording, it's an unexpected exit
         if (code !== 0 && isRecording) {
           setError(`Recording process exited unexpectedly with code ${code}`);
           
-          // Cleanup
           if (durationInterval.current) {
             clearInterval(durationInterval.current);
             durationInterval.current = null;
@@ -133,7 +111,6 @@ export function useAudioRecorder(): AudioRecorderHook {
         }
       });
       
-      // Start timer to track recording duration
       setRecordingDuration(0);
       durationInterval.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
@@ -156,10 +133,6 @@ export function useAudioRecorder(): AudioRecorderHook {
     }
   };
   
-  /**
-   * Stop recording audio
-   * @returns Promise<string | null> Path to the recording file or null if failed
-   */
   const stopRecording = async (): Promise<string | null> => {
     if (!isRecording || !recordingProcess.current) {
       return null;
@@ -169,11 +142,9 @@ export function useAudioRecorder(): AudioRecorderHook {
     console.log("Stopping recording, current path:", currentRecordingPath);
     
     try {
-      // Stop the recording process
       recordingProcess.current.kill();
       recordingProcess.current = null;
       
-      // Clear the duration interval
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
         durationInterval.current = null;
@@ -181,10 +152,8 @@ export function useAudioRecorder(): AudioRecorderHook {
       
       setIsRecording(false);
       
-      // Add a small delay to ensure the file is completely written
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Check if the recording file exists and is valid
       if (currentRecordingPath) {
         const validationResult = await validateAudioFile(currentRecordingPath);
         

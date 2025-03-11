@@ -4,16 +4,6 @@ import { getPreferenceValues } from "@raycast/api";
 import { Preferences, TranscriptionResult } from "../../types";
 import { buildCompletePrompt } from "../../constants";
 
-/**
- * Transcribes an audio file using Groq's API
- * @param filePath Path to the audio file
- * @param overrideLanguage Optional language to override the preference setting
- * @param overridePrompt Optional prompt to override the preference setting
- * @param overrideModel Optional model to override the preference setting
- * @param promptOptions Optional prompt components to override the preference settings
- * @returns Transcription result with text and metadata
- * @throws Error When transcription fails
- */
 export async function transcribeAudio(
   filePath: string, 
   options?: {
@@ -34,18 +24,14 @@ export async function transcribeAudio(
   }
 
   try {
-    // Create a Groq client with the API key
     const client = new Groq({
       apiKey: preferences.apiKey,
     });
 
-    // Read the audio file
     const fileBuffer = fs.createReadStream(filePath);
 
-    // Use the override model if provided, otherwise use preferences
     const model = options?.overrideModel ?? preferences.model;
 
-    // Create a transcription request with optional language parameter
     const transcriptionOptions: {
       file: fs.ReadStream;
       model: string;
@@ -58,30 +44,24 @@ export async function transcribeAudio(
       response_format: "verbose_json",
     };
 
-    // Use the override language if provided, otherwise use preferences
     const language = options?.overrideLanguage ?? preferences.language;
     
-    // Add language parameter if it's not set to auto
     if (language && language !== "auto") {
       transcriptionOptions.language = language;
     }
     
-    // Build the complete prompt from components
     const prompt = options?.overridePrompt ?? buildCompletePrompt(
       options?.promptOptions?.promptText ?? preferences.promptText,
       options?.promptOptions?.userTerms ?? preferences.userTerms,
       options?.promptOptions?.highlightedText
     );
     
-    // Add prompt parameter if it's not empty
     if (prompt && prompt.trim() !== "") {
       transcriptionOptions.prompt = prompt;
     }
 
-    // Create a transcription of the audio file
     const transcription = await client.audio.transcriptions.create(transcriptionOptions);
 
-    // Save the transcription to a JSON file
     const result: TranscriptionResult = {
       text: transcription.text.trim(),
       timestamp: new Date().toISOString(),
@@ -95,7 +75,6 @@ export async function transcribeAudio(
 
     return result;
   } catch (error) {
-    // Check for rate limit errors
     if (error instanceof Error && 
         (error.message.includes("rate limit") || 
          error.message.includes("429") || 
@@ -105,7 +84,6 @@ export async function transcribeAudio(
       );
     }
     
-    // Handle other API errors
     if (error instanceof Error && error.message.includes("400")) {
       throw new Error(
         "The API couldn't process this audio file. It might be corrupted or in an unsupported format."
@@ -117,13 +95,6 @@ export async function transcribeAudio(
   }
 }
 
-/**
- * Saves transcription result to a JSON file
- * @param audioFilePath Path to the original audio file
- * @param transcriptionData The transcription data to save
- * @returns Path to the saved transcription file
- * @throws Error When saving fails
- */
 export async function saveTranscription(
   audioFilePath: string, 
   transcriptionData: TranscriptionResult
@@ -144,11 +115,6 @@ export async function saveTranscription(
   }
 }
 
-/**
- * Loads a saved transcription from a JSON file
- * @param audioFilePath Path to the audio file
- * @returns Transcription data or null if not found
- */
 export async function loadTranscription(audioFilePath: string): Promise<TranscriptionResult | null> {
   const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
   
