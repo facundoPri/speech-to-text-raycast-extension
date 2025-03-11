@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Action, 
+  Action,
   ActionPanel,
   Form,
   Clipboard,
@@ -8,7 +8,7 @@ import {
   Toast,
   open,
   getPreferenceValues,
-  getSelectedText
+  getSelectedText,
 } from "@raycast/api";
 import { useForm } from "@raycast/utils";
 import { transcribeAudio } from "./utils/ai/transcription";
@@ -29,8 +29,7 @@ export default function Command() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const preferences = getPreferenceValues<Preferences>();
 
-  const { isRecording, recordingDuration, error, startRecording, stopRecording } =
-    useAudioRecorder();
+  const { isRecording, recordingDuration, error, startRecording, stopRecording } = useAudioRecorder();
 
   const { handleSubmit, itemProps, setValue, values } = useForm<TranscriptFormValues>({
     onSubmit: (values) => {
@@ -49,21 +48,19 @@ export default function Command() {
       useContext: preferences.enableContext ?? true,
     },
   });
-  
 
   const handleStopRecording = async () => {
     const recordingFilePath = await stopRecording();
-    
+
     if (recordingFilePath) {
       try {
         setIsTranscribing(true);
-        
-        
-        const languageTitle = values.language === "auto" 
-          ? "Auto-detect" 
-          : LANGUAGE_OPTIONS.find(option => option.value === values.language)?.title ?? "Auto-detect";
-        
-        
+
+        const languageTitle =
+          values.language === "auto"
+            ? "Auto-detect"
+            : (LANGUAGE_OPTIONS.find((option) => option.value === values.language)?.title ?? "Auto-detect");
+
         await showToast({
           style: Toast.Style.Animated,
           title: "Transcribing...",
@@ -76,23 +73,20 @@ export default function Command() {
         } catch (error) {
           console.error("Error getting selected text:", error);
         }
-        
-        const result = await transcribeAudio(
-          recordingFilePath, 
-          {
-            overrideLanguage: values.language,
-            overrideModel: values.model,
-            promptOptions: {
-              promptText: values.promptText,
-              userTerms: values.userTerms,
-              highlightedText: values.useContext ? selection : undefined
-            }
-          }
-        );
+
+        const result = await transcribeAudio(recordingFilePath, {
+          overrideLanguage: values.language,
+          overrideModel: values.model,
+          promptOptions: {
+            promptText: values.promptText,
+            userTerms: values.userTerms,
+            highlightedText: values.useContext ? selection : undefined,
+          },
+        });
         setValue("transcription", result.text);
-        
+
         await Clipboard.copy(result.text);
-        
+
         await showToast({
           style: Toast.Style.Success,
           title: "Transcription complete",
@@ -115,7 +109,7 @@ export default function Command() {
     setValue("transcription", "");
     startRecording();
   };
-  
+
   useEffect(() => {
     if (error) {
       showToast({
@@ -129,7 +123,7 @@ export default function Command() {
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const getPlaceholder = () => {
@@ -158,33 +152,21 @@ export default function Command() {
       actions={
         <ActionPanel>
           {!isRecording && (
-            <Action
-              title="Start Recording"
-              onAction={handleNewRecording}
-              shortcut={{ modifiers: ["cmd"], key: "r" }}
-            />
+            <Action title="Start Recording" onAction={handleNewRecording} shortcut={{ modifiers: ["cmd"], key: "r" }} />
           )}
-          
+
           {isRecording && (
-            <Action
-              title="Stop Recording"
-              onAction={handleStopRecording}
-              shortcut={{ modifiers: ["cmd"], key: "s" }}
-            />
+            <Action title="Stop Recording" onAction={handleStopRecording} shortcut={{ modifiers: ["cmd"], key: "s" }} />
           )}
-          
-          <Action.SubmitForm 
-            title="Copy to Clipboard" 
-            onSubmit={handleSubmit} 
+
+          <Action.SubmitForm
+            title="Copy to Clipboard"
+            onSubmit={handleSubmit}
             shortcut={{ modifiers: ["cmd"], key: "c" }}
           />
-          
-          <Action
-            title="New Recording"
-            onAction={handleNewRecording}
-            shortcut={{ modifiers: ["cmd"], key: "n" }}
-          />
-          
+
+          <Action title="New Recording" onAction={handleNewRecording} shortcut={{ modifiers: ["cmd"], key: "n" }} />
+
           <Action
             title="View History"
             onAction={() => open("raycast://extensions/facundo_prieto/speech-to-text/transcription-history")}
@@ -193,7 +175,6 @@ export default function Command() {
         </ActionPanel>
       }
     >
-
       <Form.TextArea
         {...itemProps.transcription}
         title={getTitle()}
@@ -210,49 +191,36 @@ export default function Command() {
         placeholder="Custom instructions to guide the AI transcription"
         info="Instructions for how the AI should approach the transcription"
       />
-      
+
       <Form.TextField
         {...itemProps.userTerms}
         title="Custom Terms"
         placeholder="React.js, TypeScript, GraphQL, John Doe"
         info="Comma-separated list of specialized terms, names, or jargon"
       />
-      
+
       <Form.Checkbox
         {...itemProps.useContext}
         title="Use Highlighted Text"
         label={`Use highlighted text as context`}
         info="Uses any text you have highlighted in another app as context for transcription"
       />
-      
+
       <Form.Dropdown
         {...itemProps.language}
         title="Language"
         info="Select a language for better transcription accuracy"
       >
-        {LANGUAGE_OPTIONS.map(option => (
-          <Form.Dropdown.Item 
-            key={option.value} 
-            value={option.value} 
-            title={option.title} 
-          />
+        {LANGUAGE_OPTIONS.map((option) => (
+          <Form.Dropdown.Item key={option.value} value={option.value} title={option.title} />
         ))}
       </Form.Dropdown>
-      
-      <Form.Dropdown
-        {...itemProps.model}
-        title="Model"
-        info="Select a model for better transcription accuracy"
-      >
-        {TRANSCRIPTION_MODELS.map(model => (
-          <Form.Dropdown.Item 
-            key={model.id} 
-            value={model.id} 
-            title={model.name} 
-          />
+
+      <Form.Dropdown {...itemProps.model} title="Model" info="Select a model for better transcription accuracy">
+        {TRANSCRIPTION_MODELS.map((model) => (
+          <Form.Dropdown.Item key={model.id} value={model.id} title={model.name} />
         ))}
       </Form.Dropdown>
-      
     </Form>
   );
 }

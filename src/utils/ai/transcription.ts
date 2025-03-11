@@ -5,17 +5,17 @@ import { Preferences, TranscriptionResult } from "../../types";
 import { buildCompletePrompt } from "../../constants";
 
 export async function transcribeAudio(
-  filePath: string, 
+  filePath: string,
   options?: {
-    overrideLanguage?: string,
-    overridePrompt?: string,
-    overrideModel?: string,
+    overrideLanguage?: string;
+    overridePrompt?: string;
+    overrideModel?: string;
     promptOptions?: {
       promptText?: string;
       userTerms?: string;
       highlightedText?: string;
-    }
-  }
+    };
+  },
 ): Promise<TranscriptionResult> {
   const preferences = getPreferenceValues<Preferences>();
 
@@ -45,17 +45,19 @@ export async function transcribeAudio(
     };
 
     const language = options?.overrideLanguage ?? preferences.language;
-    
+
     if (language && language !== "auto") {
       transcriptionOptions.language = language;
     }
-    
-    const prompt = options?.overridePrompt ?? buildCompletePrompt(
-      options?.promptOptions?.promptText ?? preferences.promptText,
-      options?.promptOptions?.userTerms ?? preferences.userTerms,
-      options?.promptOptions?.highlightedText
-    );
-    
+
+    const prompt =
+      options?.overridePrompt ??
+      buildCompletePrompt(
+        options?.promptOptions?.promptText ?? preferences.promptText,
+        options?.promptOptions?.userTerms ?? preferences.userTerms,
+        options?.promptOptions?.highlightedText,
+      );
+
     if (prompt && prompt.trim() !== "") {
       transcriptionOptions.prompt = prompt;
     }
@@ -75,37 +77,35 @@ export async function transcribeAudio(
 
     return result;
   } catch (error) {
-    if (error instanceof Error && 
-        (error.message.includes("rate limit") || 
-         error.message.includes("429") || 
-         error.message.includes("too many requests"))) {
-      throw new Error(
-        "Groq API rate limit exceeded. Please try again later or reduce the length of your audio file."
-      );
+    if (
+      error instanceof Error &&
+      (error.message.includes("rate limit") ||
+        error.message.includes("429") ||
+        error.message.includes("too many requests"))
+    ) {
+      throw new Error("Groq API rate limit exceeded. Please try again later or reduce the length of your audio file.");
     }
-    
+
     if (error instanceof Error && error.message.includes("400")) {
-      throw new Error(
-        "The API couldn't process this audio file. It might be corrupted or in an unsupported format."
-      );
+      throw new Error("The API couldn't process this audio file. It might be corrupted or in an unsupported format.");
     }
-    
+
     console.error("Transcription error:", error);
     throw new Error(`Failed to transcribe audio: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 export async function saveTranscription(
-  audioFilePath: string, 
-  transcriptionData: TranscriptionResult
+  audioFilePath: string,
+  transcriptionData: TranscriptionResult,
 ): Promise<string> {
   const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
-  
+
   const dataToSave = {
     ...transcriptionData,
-    audioFile: audioFilePath
+    audioFile: audioFilePath,
   };
-  
+
   try {
     await fs.writeJSON(transcriptionFilePath, dataToSave, { spaces: 2 });
     return transcriptionFilePath;
@@ -117,7 +117,7 @@ export async function saveTranscription(
 
 export async function loadTranscription(audioFilePath: string): Promise<TranscriptionResult | null> {
   const transcriptionFilePath = audioFilePath.replace(/\.[^.]+$/, ".json");
-  
+
   try {
     if (await fs.pathExists(transcriptionFilePath)) {
       return await fs.readJSON(transcriptionFilePath);

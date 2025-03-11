@@ -124,6 +124,7 @@
     {
       "name": "enableContext",
       "title": "Use Highlighted Text",
+      "label": "Use highlighted text as context",
       "description": "Automatically use any text you have highlighted in other apps as context for transcription",
       "type": "checkbox",
       "default": true,
@@ -148,8 +149,8 @@
     "@raycast/eslint-config": "^1.0.11",
     "@types/node": "20.8.10",
     "@types/react": "18.3.3",
-    "eslint": "^8.57.0",
-    "prettier": "^3.3.3",
+    "eslint": "^8.57.1",
+    "prettier": "^3.5.3",
     "typescript": "^5.4.5"
   },
   "scripts": {

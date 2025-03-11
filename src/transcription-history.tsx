@@ -35,18 +35,20 @@ export default function TranscriptionHistory() {
   const parseRecordingDate = (fileName: string): Date => {
     const regex = /recording-(.+)\.wav$/;
     const dateMatch = regex.exec(fileName);
-    const dateStr = dateMatch ? dateMatch[1].replace(/-/g, (match, offset) => {
-      if (offset === 10) return "T"; // After date
-      if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
-      return "-"; // Date separators
-    }) : "";
-    
+    const dateStr = dateMatch
+      ? dateMatch[1].replace(/-/g, (match, offset) => {
+          if (offset === 10) return "T"; // After date
+          if (offset > 10) return offset === 13 || offset === 16 ? ":" : "."; // Time separators
+          return "-"; // Date separators
+        })
+      : "";
+
     return dateStr ? new Date(dateStr) : new Date();
   };
 
   const loadTranscriptionFromFile = async (filePath: string): Promise<string | null> => {
     const transcriptionFilePath = filePath.replace(/\.wav$/, ".json");
-    
+
     if (await fs.pathExists(transcriptionFilePath)) {
       try {
         const transcriptionData = await fs.readJSON(transcriptionFilePath);
@@ -55,7 +57,7 @@ export default function TranscriptionHistory() {
         console.error(`Error reading transcription file ${transcriptionFilePath}:`, error);
       }
     }
-    
+
     return null;
   };
 
@@ -134,24 +136,21 @@ export default function TranscriptionHistory() {
       title: "Transcribing...",
       message: file.fileName,
     });
-    
-    const result = await transcribeAudio(
-      file.filePath,
-      {
-        overrideLanguage: transcriptionData?.language,
-        overridePrompt: transcriptionData?.prompt,
-        overrideModel: transcriptionData?.model,
-      }
-    );
-    
+
+    const result = await transcribeAudio(file.filePath, {
+      overrideLanguage: transcriptionData?.language,
+      overridePrompt: transcriptionData?.prompt,
+      overrideModel: transcriptionData?.model,
+    });
+
     await saveTranscription(file.filePath, result);
 
-    setFiles(prevFiles =>
-      prevFiles.map(f =>
+    setFiles((prevFiles) =>
+      prevFiles.map((f) =>
         f.id === file.id
           ? { ...f, transcription: result.text, wordCount: result.text.split(/\s+/).filter(Boolean).length }
-          : f
-      )
+          : f,
+      ),
     );
 
     await copyTranscription(result.text);
@@ -163,27 +162,27 @@ export default function TranscriptionHistory() {
       let useOriginalSettings = true;
 
       if (existingTranscription) {
-      useOriginalSettings = await confirmAlert({
-        title: "Re-transcribe Audio",
-        message: "Do you want to use the original settings or modify them?",
-        primaryAction: {
-          title: "Use Original Settings",
-        },
-        dismissAction: {
-          title: "Modify Settings",
-        },
-      });
+        useOriginalSettings = await confirmAlert({
+          title: "Re-transcribe Audio",
+          message: "Do you want to use the original settings or modify them?",
+          primaryAction: {
+            title: "Use Original Settings",
+          },
+          dismissAction: {
+            title: "Modify Settings",
+          },
+        });
       }
-      
+
       if (useOriginalSettings) {
         await performTranscription(file, existingTranscription);
       } else {
         push(
-          <TranscriptionSettingsForm 
-            file={file} 
-            existingTranscription={existingTranscription} 
-            onTranscribe={performTranscription} 
-          />
+          <TranscriptionSettingsForm
+            file={file}
+            existingTranscription={existingTranscription}
+            onTranscribe={performTranscription}
+          />,
         );
       }
     } catch (error) {
@@ -217,7 +216,7 @@ export default function TranscriptionHistory() {
         await trash(transcriptionFilePath);
       }
 
-      setFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
+      setFiles((prevFiles) => prevFiles.filter((f) => f.id !== file.id));
 
       await showToast({
         style: Toast.Style.Success,
@@ -235,14 +234,11 @@ export default function TranscriptionHistory() {
     }
   };
 
-  const filteredFiles = files.filter(file => {
+  const filteredFiles = files.filter((file) => {
     if (!searchText) return true;
 
     const searchLower = searchText.toLowerCase();
-    return (
-      file.fileName.toLowerCase().includes(searchLower) ||
-      file.transcription?.toLowerCase().includes(searchLower)
-    );
+    return file.fileName.toLowerCase().includes(searchLower) || file.transcription?.toLowerCase().includes(searchLower);
   });
 
   return (
@@ -255,7 +251,7 @@ export default function TranscriptionHistory() {
       isShowingDetail={isShowingDetails}
     >
       <List.Section title="Recordings" subtitle={filteredFiles.length.toString()}>
-        {filteredFiles.map(file => (
+        {filteredFiles.map((file) => (
           <List.Item
             key={file.id}
             title={formatDate(file.recordedAt)}
@@ -265,21 +261,20 @@ export default function TranscriptionHistory() {
               {
                 tag: {
                   value: file.transcription ? "Transcribed" : "Audio Only",
-                  color: file.transcription ? Color.Green : Color.Orange
-                }
-              }
+                  color: file.transcription ? Color.Green : Color.Orange,
+                },
+              },
             ]}
             detail={
               <List.Item.Detail
-                markdown={file.transcription
-                  ? `# Transcription:\n\n${file.transcription}`
-                  : "# No Transcription\n\nThis recording hasn't been transcribed yet. Use the Transcribe action (⌘T) to generate a transcription."
+                markdown={
+                  file.transcription
+                    ? `# Transcription:\n\n${file.transcription}`
+                    : "# No Transcription\n\nThis recording hasn't been transcribed yet. Use the Transcribe action (⌘T) to generate a transcription."
                 }
                 metadata={
                   <List.Item.Detail.Metadata>
-                    <List.Item.Detail.Metadata.TagList
-                      title="File Name"
-                    >
+                    <List.Item.Detail.Metadata.TagList title="File Name">
                       <List.Item.Detail.Metadata.TagList.Item
                         text={file.fileName}
                         icon={{ source: Icon.Document, tintColor: Color.PrimaryText }}
@@ -385,31 +380,25 @@ export default function TranscriptionHistory() {
   );
 }
 
-function TranscriptionSettingsForm({ 
-  file, 
-  existingTranscription, 
-  onTranscribe 
-}: { 
-  file: TranscriptionFile; 
+function TranscriptionSettingsForm({
+  file,
+  existingTranscription,
+  onTranscribe,
+}: {
+  file: TranscriptionFile;
   existingTranscription: TranscriptionResult | null;
   onTranscribe: (file: TranscriptionFile, transcription: TranscriptionResult | null) => Promise<void>;
 }) {
   const { pop } = useNavigation();
   const preferences = getPreferenceValues<Preferences>();
-  
-  const [language, setLanguage] = useState<string>(
-    existingTranscription?.language ?? preferences.language ?? "auto"
-  );
-  const [promptText, setPromptText] = useState<string>(
-    existingTranscription?.prompt ?? preferences.promptText ?? ""
-  );
-  const [model, setModel] = useState<string>(
-    existingTranscription?.model ?? preferences.model
-  );
-  
+
+  const [language, setLanguage] = useState<string>(existingTranscription?.language ?? preferences.language ?? "auto");
+  const [promptText, setPromptText] = useState<string>(existingTranscription?.prompt ?? preferences.promptText ?? "");
+  const [model, setModel] = useState<string>(existingTranscription?.model ?? preferences.model);
+
   const handleSubmit = async () => {
     const prompt = existingTranscription?.prompt ?? buildCompletePrompt(promptText, preferences.userTerms);
-    
+
     const modifiedTranscription: TranscriptionResult = {
       ...(existingTranscription || {}),
       text: existingTranscription?.text ?? "",
@@ -418,12 +407,12 @@ function TranscriptionSettingsForm({
       prompt,
       model,
     };
-    
+
     pop();
-    
+
     await onTranscribe(file, modifiedTranscription);
   };
-  
+
   return (
     <Form
       actions={
@@ -440,30 +429,17 @@ function TranscriptionSettingsForm({
         onChange={setModel}
         info="Select the AI model to use for transcription"
       >
-        {TRANSCRIPTION_MODELS.map(model => (
-          <Form.Dropdown.Item 
-            key={model.id} 
-            value={model.id} 
-            title={model.name} 
-          />
+        {TRANSCRIPTION_MODELS.map((model) => (
+          <Form.Dropdown.Item key={model.id} value={model.id} title={model.name} />
         ))}
       </Form.Dropdown>
-      
-      <Form.Dropdown
-        id="language"
-        title="Language"
-        value={language}
-        onChange={setLanguage}
-      >
-        {LANGUAGE_OPTIONS.map(option => (
-          <Form.Dropdown.Item 
-            key={option.value} 
-            value={option.value} 
-            title={option.title} 
-          />
+
+      <Form.Dropdown id="language" title="Language" value={language} onChange={setLanguage}>
+        {LANGUAGE_OPTIONS.map((option) => (
+          <Form.Dropdown.Item key={option.value} value={option.value} title={option.title} />
         ))}
       </Form.Dropdown>
-      
+
       <Form.TextArea
         id="promptText"
         title="Prompt"

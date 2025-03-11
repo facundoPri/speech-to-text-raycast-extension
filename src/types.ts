@@ -28,7 +28,6 @@ export interface TranscriptionResult {
   model?: string;
 }
 
-
 export enum ErrorTypes {
   SOX_NOT_INSTALLED = "Sox is not installed. Please install it using 'brew install sox' and restart Raycast.",
   ALREADY_RECORDING = "Recording is already in progress",
@@ -42,9 +41,8 @@ export enum ErrorTypes {
   AUDIO_FILE_EMPTY = "Audio file is empty",
   AUDIO_FILE_TOO_SMALL = "Audio file is too small to be valid",
   AUDIO_FILE_INVALID_FORMAT = "Audio file format is invalid",
-  AUDIO_FILE_VALIDATION_ERROR = "Failed to validate audio file"
+  AUDIO_FILE_VALIDATION_ERROR = "Failed to validate audio file",
 }
-
 
 export interface AudioValidationResult {
   isValid: boolean;

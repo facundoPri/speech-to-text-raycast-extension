@@ -37,35 +37,36 @@ export const LANGUAGE_OPTIONS = [
  * @param highlightedText The text currently highlighted by the user (if any)
  * @returns Combined prompt string
  */
-export function buildCompletePrompt(
-  promptText?: string, 
-  userTerms?: string, 
-  highlightedText?: string
-): string {
+export function buildCompletePrompt(promptText?: string, userTerms?: string, highlightedText?: string): string {
   const parts: string[] = [];
-  
+
   if (promptText && promptText.trim() !== "") {
     parts.push(promptText.trim());
   }
-  
+
   if (userTerms && userTerms.trim() !== "") {
-    const termsArray = userTerms.split(",").map(term => term.trim()).filter(term => term !== "");
+    const termsArray = userTerms
+      .split(",")
+      .map((term) => term.trim())
+      .filter((term) => term !== "");
     if (termsArray.length > 0) {
-      parts.push(`The following are specialized terms or names that should be recognized correctly: ${termsArray.join(", ")}.`);
+      parts.push(
+        `The following are specialized terms or names that should be recognized correctly: ${termsArray.join(", ")}.`,
+      );
     }
   }
-  
+
   if (highlightedText && highlightedText.trim() !== "") {
     parts.push(`Use the following text as context for the transcription:\n "${highlightedText.trim()}"`);
   }
-  
+
   return parts.join(" ");
 }
 
 // Sox Configuration
 export const SOX_CONFIG = {
-  CHANNELS: 1,           // Mono channel
-  BIT_DEPTH: 16,         // 16-bit depth
+  CHANNELS: 1, // Mono channel
+  BIT_DEPTH: 16, // 16-bit depth
   ENCODING: "signed-integer", // Signed integer encoding
-  VERBOSE_LEVEL: 1,      // Verbose level for better error reporting
+  VERBOSE_LEVEL: 1, // Verbose level for better error reporting
 } as const;

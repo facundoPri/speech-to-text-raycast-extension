@@ -46,42 +46,41 @@ export async function listAudioFiles(directory: string = DEFAULT_TEMP_DIR): Prom
 
 export async function validateAudioFile(filePath: string): Promise<AudioValidationResult> {
   try {
-    if (!await fs.pathExists(filePath)) {
+    if (!(await fs.pathExists(filePath))) {
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_MISSING };
     }
-    
+
     const stats = await fs.stat(filePath);
     if (stats.size === 0) {
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_EMPTY };
     }
-    
+
     if (stats.size < MIN_VALID_FILE_SIZE) {
       return { isValid: false, error: ErrorTypes.AUDIO_FILE_TOO_SMALL };
     }
-    
+
     const soxPath = await checkSoxInstalled();
     if (soxPath) {
       try {
-        execSync(`${soxPath} --i "${filePath}"`, { stdio: 'pipe' });
+        execSync(`${soxPath} --i "${filePath}"`, { stdio: "pipe" });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return { 
-          isValid: false, 
-          error: `${ErrorTypes.AUDIO_FILE_INVALID_FORMAT}: ${errorMessage}` 
+        return {
+          isValid: false,
+          error: `${ErrorTypes.AUDIO_FILE_INVALID_FORMAT}: ${errorMessage}`,
         };
       }
     }
-    
+
     return { isValid: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return { 
-      isValid: false, 
-      error: `${ErrorTypes.AUDIO_FILE_VALIDATION_ERROR}: ${errorMessage}` 
+    return {
+      isValid: false,
+      error: `${ErrorTypes.AUDIO_FILE_VALIDATION_ERROR}: ${errorMessage}`,
     };
   }
 }
-
 
 async function estimateDurationFromFileSize(filePath: string): Promise<number> {
   const { size } = await fs.stat(filePath);
@@ -100,21 +99,19 @@ export async function getAudioDuration(filePath: string): Promise<number> {
 
     const stdout = await execSync(`${soxPath} --i -D "${filePath}"`);
     const duration = parseFloat(stdout.toString().trim());
-    
+
     if (isNaN(duration) || duration <= 0) {
       throw new Error("Invalid duration returned by Sox");
     }
-    
+
     return Math.round(duration);
   } catch (error) {
     console.error(`Error getting duration for ${filePath}:`, error);
-    
+
     try {
       return await estimateDurationFromFileSize(filePath);
     } catch (fallbackError) {
-      throw new Error(
-        `Failed to get audio duration: ${error instanceof Error ? error.message : String(error)}`
-      );
+      throw new Error(`Failed to get audio duration: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
@@ -122,11 +119,15 @@ export async function getAudioDuration(filePath: string): Promise<number> {
 export function buildSoxCommand(outputPath: string): string[] {
   return [
     "-d",
-    "-c", String(SOX_CONFIG.CHANNELS),
-    "-r", String(RECORDING_SAMPLE_RATE),
-    "-b", String(SOX_CONFIG.BIT_DEPTH),
-    "-e", SOX_CONFIG.ENCODING,
+    "-c",
+    String(SOX_CONFIG.CHANNELS),
+    "-r",
+    String(RECORDING_SAMPLE_RATE),
+    "-b",
+    String(SOX_CONFIG.BIT_DEPTH),
+    "-e",
+    SOX_CONFIG.ENCODING,
     "-V" + String(SOX_CONFIG.VERBOSE_LEVEL),
-    outputPath
+    outputPath,
   ];
 }
