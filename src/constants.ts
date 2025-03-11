@@ -6,7 +6,6 @@ import path from "path";
 export const DEFAULT_TEMP_DIR = path.join(os.homedir(), ".raycast-speech-to-text-temp");
 
 export const RECORDING_FILE_FORMAT = "wav";
-export const RECORDING_MAX_DURATION = 60;
 export const RECORDING_SAMPLE_RATE = 16000; // 16kHz
 
 export const TRANSCRIPTION_MODELS = [
@@ -15,9 +14,10 @@ export const TRANSCRIPTION_MODELS = [
   { id: "distil-whisper-large-v3-en", name: "Distil Whisper" },
 ];
 
-/**
- * Maximum allowed audio duration in seconds
- * Groq has a daily limit of 8 hours (~28800 seconds)
- * We set a conservative limit of 2 hours per file
- */
-export const MAX_AUDIO_DURATION_SECONDS = 7000; // ~2 hours
+// Sox Configuration
+export const SOX_CONFIG = {
+  CHANNELS: 1,           // Mono channel
+  BIT_DEPTH: 16,         // 16-bit depth
+  ENCODING: "signed-integer", // Signed integer encoding
+  VERBOSE_LEVEL: 1,      // Verbose level for better error reporting
+} as const;

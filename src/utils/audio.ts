@@ -1,13 +1,10 @@
-import { execSync, spawn, ChildProcess } from "child_process";
+import { execSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
-import { DEFAULT_TEMP_DIR, RECORDING_FILE_FORMAT, RECORDING_MAX_DURATION, RECORDING_SAMPLE_RATE } from "../constants";
+import { DEFAULT_TEMP_DIR, RECORDING_FILE_FORMAT, RECORDING_SAMPLE_RATE, SOX_CONFIG } from "../constants";
+import { AudioValidationResult, ErrorTypes } from "../types";
 
-export interface RecordingProcess {
-  filePath: string;
-  process: ChildProcess;
-  stop: () => Promise<string>;
-}
+const MIN_VALID_FILE_SIZE = 1024; // 1KB
 
 /**
  * Ensures the temporary directory exists
@@ -52,48 +49,6 @@ export async function checkSoxInstalled(): Promise<string | null> {
 }
 
 /**
- * Creates a recording process using sox
- * @param soxPath Path to the sox executable
- * @param filePath Path to save the recording
- * @param duration Maximum recording duration in seconds
- * @returns ChildProcess instance
- */
-export function createRecordingProcess(
-  soxPath: string,
-  filePath: string,
-  duration: number = RECORDING_MAX_DURATION,
-): ChildProcess {
-  return spawn(soxPath, [
-    "-d", // Use default audio input device
-    "-r",
-    String(RECORDING_SAMPLE_RATE), // Sample rate
-    filePath, // Output file path
-    "trim",
-    "0",
-    String(duration), // Duration
-  ]);
-}
-
-/**
- * Verifies that a recording file exists and has content
- * @param filePath Path to the recording file
- * @throws Error if file doesn't exist or is empty
- */
-export async function verifyRecordingFile(filePath: string): Promise<void> {
-  try {
-    const stats = await fs.stat(filePath);
-    if (stats.size === 0) {
-      throw new Error("Recording file is empty. Please check your microphone permissions.");
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("empty")) {
-      throw error;
-    }
-    throw new Error(`Failed to verify recording: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-/**
  * Lists all audio files in the temp directory
  * @param directory Directory to list files from
  * @returns Array of file paths
@@ -108,35 +63,52 @@ export async function listAudioFiles(directory: string = DEFAULT_TEMP_DIR): Prom
 }
 
 /**
- * Cleans up old audio files from the temp directory
- * @param directory Directory to clean
- * @param maxAge Maximum age of files to keep (in milliseconds)
+ * Validates an audio file to ensure it exists and has content
+ * @param filePath Path to the audio file
+ * @returns Object with validation result and optional error message
  */
-export async function cleanupOldAudioFiles(
-  directory: string = DEFAULT_TEMP_DIR,
-  maxAge: number = 24 * 60 * 60 * 1000, // 24 hours
-): Promise<void> {
+export async function validateAudioFile(filePath: string): Promise<AudioValidationResult> {
   try {
-    const now = Date.now();
-    const files = await listAudioFiles(directory);
-
-    for (const file of files) {
+    // Check if file exists
+    if (!await fs.pathExists(filePath)) {
+      return { isValid: false, error: ErrorTypes.AUDIO_FILE_MISSING };
+    }
+    
+    // Check file size
+    const stats = await fs.stat(filePath);
+    if (stats.size === 0) {
+      return { isValid: false, error: ErrorTypes.AUDIO_FILE_EMPTY };
+    }
+    
+    if (stats.size < MIN_VALID_FILE_SIZE) {
+      return { isValid: false, error: ErrorTypes.AUDIO_FILE_TOO_SMALL };
+    }
+    
+    // Try to validate with Sox if possible
+    const soxPath = await checkSoxInstalled();
+    if (soxPath) {
       try {
-        const stats = await fs.stat(file);
-        const fileAge = now - stats.mtimeMs;
-
-        if (fileAge > maxAge) {
-          await fs.unlink(file);
-          console.log(`Deleted old recording: ${file}`);
-        }
+        // This will throw an error if the file is not a valid audio file
+        execSync(`${soxPath} --i "${filePath}"`, { stdio: 'pipe' });
       } catch (error) {
-        console.error(`Error processing file ${file}:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return { 
+          isValid: false, 
+          error: `${ErrorTypes.AUDIO_FILE_INVALID_FORMAT}: ${errorMessage}` 
+        };
       }
     }
+    
+    return { isValid: true };
   } catch (error) {
-    console.error("Error cleaning up old audio files:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { 
+      isValid: false, 
+      error: `${ErrorTypes.AUDIO_FILE_VALIDATION_ERROR}: ${errorMessage}` 
+    };
   }
 }
+
 
 async function estimateDurationFromFileSize(filePath: string): Promise<number> {
   const { size } = await fs.stat(filePath);
@@ -172,4 +144,21 @@ export async function getAudioDuration(filePath: string): Promise<number> {
       );
     }
   }
+}
+
+/**
+ * Builds the Sox command arguments for recording
+ * @param outputPath Path where the recording will be saved
+ * @returns Array of command arguments for Sox
+ */
+export function buildSoxCommand(outputPath: string): string[] {
+  return [
+    "-d",                // Use default audio input device
+    "-c", String(SOX_CONFIG.CHANNELS),
+    "-r", String(RECORDING_SAMPLE_RATE),
+    "-b", String(SOX_CONFIG.BIT_DEPTH),
+    "-e", SOX_CONFIG.ENCODING,
+    "-V" + String(SOX_CONFIG.VERBOSE_LEVEL), // Verbose level for better error reporting
+    outputPath           // Output file path
+  ];
 }

@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { ChildProcess, exec, spawn } from "child_process";
-import fs from "fs";
-import { generateAudioFilename, ensureTempDirectory } from "../utils/audio";
-import { RECORDING_SAMPLE_RATE } from "../constants";
+import { ChildProcess, spawn } from "child_process";
+import { 
+  generateAudioFilename, 
+  ensureTempDirectory, 
+  checkSoxInstalled, 
+  buildSoxCommand,
+  validateAudioFile,
+} from "../utils/audio";
 import { showToast, Toast } from "@raycast/api";
+import { ErrorTypes } from "../types";
 
 interface AudioRecorderHook {
   isRecording: boolean;
@@ -32,7 +37,7 @@ export function useAudioRecorder(): AudioRecorderHook {
     const checkSox = async () => {
       const soxPath = await checkSoxInstalled();
       if (!soxPath) {
-        setError("Sox is not installed. Please install it using 'brew install sox' and restart Raycast.");
+        setError(ErrorTypes.SOX_NOT_INSTALLED);
       }
     };
     
@@ -45,23 +50,15 @@ export function useAudioRecorder(): AudioRecorderHook {
       }
     };
   }, []);
-  
+
   /**
-   * Check if Sox is installed
+   * Shows a toast notification for an error without setting the error state
    */
-  const checkSoxInstalled = async (): Promise<string | null> => {
-    return new Promise((resolve) => {
-      // Try to execute Sox with the version flag to check if it's available
-      exec(`which sox || ([ -f /usr/bin/sox ] && echo /usr/bin/sox) || ([ -f /usr/local/bin/sox ] && echo /usr/local/bin/sox) || ([ -f /opt/homebrew/bin/sox ] && echo /opt/homebrew/bin/sox)`, (error, stdout) => {
-        if (error || !stdout.trim()) {
-          console.error("Sox not found:", error);
-          resolve(null);
-        } else {
-          const soxPath = stdout.trim();
-          console.log("Sox found at:", soxPath);
-          resolve(soxPath);
-        }
-      });
+  const showErrorToast = async (title: string, message: string): Promise<void> => {
+    await showToast({
+      style: Toast.Style.Failure,
+      title,
+      message,
     });
   };
   
@@ -70,27 +67,23 @@ export function useAudioRecorder(): AudioRecorderHook {
    * @returns Promise<string | null> Path to the recording file or null if failed
    */
   const startRecording = async (): Promise<string | null> => {
+    // Clear any previous errors
+    setError(null);
+    
+    // Check if already recording
     if (isRecording) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Already recording",
-      });
+      await showErrorToast("Already Recording", "A recording is already in progress");
       return null;
     }
     
     // Check if Sox is installed
     const soxPath = await checkSoxInstalled();
     if (!soxPath) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Sox not installed or not found",
-        message: "Please install Sox using 'brew install sox' and restart Raycast",
-      });
+      setError(ErrorTypes.SOX_NOT_INSTALLED);
       return null;
     }
     
     try {
-      setError(null);
       // Generate a unique filename
       const tempDir = await ensureTempDirectory();
       const outputPath = generateAudioFilename(tempDir);
@@ -99,14 +92,7 @@ export function useAudioRecorder(): AudioRecorderHook {
       
       // Start recording using Sox
       console.log("Starting recording with Sox");
-      recordingProcess.current = spawn("sox", [
-        "-d",                // Use default audio input device
-        "-c", "1",           // Mono channel
-        "-r", String(RECORDING_SAMPLE_RATE),       // 16kHz sample rate
-        "-b", "16",          // 16-bit depth
-        "-e", "signed-integer", // Signed integer encoding
-        outputPath           // Output file path
-      ]);
+      recordingProcess.current = spawn(soxPath, buildSoxCommand(outputPath));
       
       // Add event listeners for debugging
       recordingProcess.current.stdout?.on('data', (data) => {
@@ -119,15 +105,32 @@ export function useAudioRecorder(): AudioRecorderHook {
       
       recordingProcess.current?.on('error', (error) => {
         console.error(`Sox process error: ${error.message}`);
-        showToast({
-          style: Toast.Style.Failure,
-          title: "Recording error",
-          message: error.message,
-        });
+        setError(`${ErrorTypes.RECORDING_PROCESS_ERROR}: ${error.message}`);
+        
+        // Cleanup
+        if (durationInterval.current) {
+          clearInterval(durationInterval.current);
+          durationInterval.current = null;
+        }
+        
+        setIsRecording(false);
       });
       
       recordingProcess.current?.on('close', (code) => {
         console.log(`Sox process exited with code ${code}`);
+        
+        // If code is non-zero and we're still recording, it's an unexpected exit
+        if (code !== 0 && isRecording) {
+          setError(`Recording process exited unexpectedly with code ${code}`);
+          
+          // Cleanup
+          if (durationInterval.current) {
+            clearInterval(durationInterval.current);
+            durationInterval.current = null;
+          }
+          
+          setIsRecording(false);
+        }
       });
       
       // Start timer to track recording duration
@@ -145,12 +148,10 @@ export function useAudioRecorder(): AudioRecorderHook {
       
       return outputPath;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error starting recording:", error);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to start recording",
-        message: String(error),
-      });
+      
+      setError(`${ErrorTypes.RECORDING_START_ERROR}: ${errorMessage}`);
       return null;
     }
   };
@@ -168,7 +169,6 @@ export function useAudioRecorder(): AudioRecorderHook {
     console.log("Stopping recording, current path:", currentRecordingPath);
     
     try {
-      setError(null);
       // Stop the recording process
       recordingProcess.current.kill();
       recordingProcess.current = null;
@@ -184,13 +184,12 @@ export function useAudioRecorder(): AudioRecorderHook {
       // Add a small delay to ensure the file is completely written
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Check if the recording file exists
-      if (currentRecordingPath && fs.existsSync(currentRecordingPath)) {
-        const stats = fs.statSync(currentRecordingPath);
-        console.log("Recording file size:", stats.size, "bytes");
+      // Check if the recording file exists and is valid
+      if (currentRecordingPath) {
+        const validationResult = await validateAudioFile(currentRecordingPath);
         
-        if (stats.size === 0) {
-          setError("The recording file is empty");
+        if (!validationResult.isValid) {
+          setError(validationResult.error ?? ErrorTypes.INVALID_RECORDING);
           return null;
         }
         
@@ -203,21 +202,14 @@ export function useAudioRecorder(): AudioRecorderHook {
         console.log("Returning recording path:", currentRecordingPath);
         return currentRecordingPath;
       } else {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Recording failed",
-          message: "No recording file was created",
-        });
+        setError(ErrorTypes.NO_RECORDING_FILE);
         return null;
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error stopping recording:", error);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to stop recording",
-        message: String(error),
-      });
       
+      setError(`${ErrorTypes.RECORDING_STOP_ERROR}: ${errorMessage}`);
       setIsRecording(false);
       return null;
     }
